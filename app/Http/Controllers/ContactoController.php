@@ -22,80 +22,19 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class ContactoController extends Controller
 {
-    public function index(Request $request)
+
+    public function index()
     {
-        try {
-            // Validar si el usuario está autenticado
-            $user = Auth::user();
-            if (!$user) {
-                Log::error('Usuario no autenticado intentando acceder a contactos.');
-                return response()->json(['error' => 'Usuario no autenticado.'], 401);
-            }
-
-            // Obtener campos personalizados
-            $customFields = $user->customFields;
-
-            // Procesar solicitud Ajax
-            if ($request->ajax()) {
-                // Depuración inicial: Validar datos básicos del usuario
-                Log::info('Usuario autenticado:', ['id' => $user->id, 'email' => $user->email]);
-
-                // Obtener contactos con las etiquetas del usuario actual
-                $data = $user->contactos()->with([
-                    'tags' => function ($query) use ($user) {
-                        $query->where('user_id', $user->id);
-                    }
-                ])->get();
-
-                // Depuración: Validar datos obtenidos
-                if ($data->isEmpty()) {
-                    Log::warning('El usuario no tiene contactos asociados.');
-                } else {
-                    Log::info('Contactos obtenidos:', ['count' => $data->count()]);
-                }
-
-                // Retornar datos en formato DataTables
-                return DataTables::of($data)
-                    ->addIndexColumn()
-                    ->addColumn('tags', function ($contacto) {
-                        return $contacto->tags->map(function ($tag) {
-                            return '<span style="background-color: ' . e($tag->color) . '; padding: 5px; border-radius: 4px;">' . e($tag->nombre) . '</span>';
-                        })->implode(' ');
-                    })
-                    ->addColumn('action', function ($data) {
-                        $button = '<button type="button" name="edit" id="' . e($data->id) . '" class="edit btn btn-primary btn-sm" style="margin-right: 8px;"> <i class="fa fa-edit"></i></button>';
-                        $button .= '<button type="button" name="delete" id="' . e($data->id) . '" class="delete btn btn-danger btn-sm"> <i class="fa fa-trash"></i></button>';
-                        return $button;
-                    })
-                    ->rawColumns(['tags', 'action'])
-                    ->make(true);
-            }
-
-            // Obtener etiquetas asociadas al usuario
-            $tags = $user->tags()->get();
-
-            // Depuración: Validar si las etiquetas están disponibles
-            if ($tags->isEmpty()) {
-                Log::warning('El usuario no tiene etiquetas asociadas.');
-            }
-
-            // Retornar vista
-            return view('contactos.index', compact(['tags', 'customFields']));
-        } catch (Exception $e) {
-            // Registrar el error y retornar respuesta genérica
-            Log::error('Error en el controlador Contactos:', [
-                'message' => $e->getMessage(),
-                'line' => $e->getLine(),
-                'file' => $e->getFile(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            return response()->json(['error' => 'Ocurrió un error inesperado.'], 500);
+        $user = Auth::user();
+        if (!$user) {
+            Log::error('Usuario no autenticado intentando acceder a contactos.');
+            return response()->json(['error' => 'Usuario no autenticado.'], 401);
         }
+        // Obtener campos personalizados
+        $customFields = $user->customFields;
+        $tags = $user->tags()->get();
+        return view('contactos.index', compact('customFields', 'tags'));
     }
-
-
-
-
 
     public function store(Request $request)
     {
@@ -157,15 +96,14 @@ class ContactoController extends Controller
 
 
 
-            return response()->json([
-                'success' => true,
-                'data' => $contacto
-            ], 201);
+            // Redirigir con mensaje de éxito
+            return redirect()
+                ->route('contactos.index') // Cambia esto a tu ruta correspondiente
+                ->with('success', 'Contacto creado correctamente.');
         } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'error' => $e->getMessage()
-            ], 500);
+            return redirect()
+                ->route('contactos.index')
+                ->with('error', 'Hubo un problema al crear el contacto. Por favor, inténtalo nuevamente.');
         }
     }
 
@@ -334,22 +272,28 @@ class ContactoController extends Controller
         try {
             Excel::import(new ContactosImport, $request->file);
             return redirect()->route('contactos.index')->with('success', 'Contactos importados con éxito');
-        } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
-            // Obtener los errores de validación del CSV
-            $failures = $e->failures();
+        } catch (ValidationException $e) {
             $errors = [];
-            foreach ($failures as $failure) {
-                $errors[] = "Fila " . $failure->row() . ": " . $failure->errors()[0];
+            foreach ($e->errors() as $field => $messages) {
+                foreach ($messages as $message) {
+                    $errors[] = $message; // Capturar todos los mensajes de error
+                }
             }
-            // Redireccionar de vuelta con los errores
+
             return redirect()->back()->withErrors($errors)->withInput();
         } catch (Exception $e) {
-            // Registrar el error general en el log
             Log::error('Ha ocurrido un error al importar los contactos: ' . $e->getMessage(), ['exception' => $e]);
-            // Otro tipo de errores
-            return redirect()->back()->withErrors(['error' => 'Ha ocurrido un error al importar los contactos.'])->withInput();
+
+            return redirect()
+                ->back()
+                ->withErrors(['error' => 'Ha ocurrido un error inesperado al importar los contactos. Por favor, inténtalo de nuevo.'])
+                ->withInput();
         }
     }
+
+
+
+
 
 
     public function exportar()

@@ -1,6 +1,7 @@
 <?php
 
 use App\Events\Webhook;
+use App\Livewire\ContactoComponent;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\HomeController;
@@ -44,4 +45,5 @@ Route::middleware(['auth'])->group(function () {
 Route::get('/health', function () {
     return response()->json(['status' => 'ok'], 200);
 });
+Route::get('contact', ContactoComponent::class)->name('contact.index');
 

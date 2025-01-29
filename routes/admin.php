@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\ContactoComponent;
 use App\Models\Reporte;
 use App\Http\Controllers\BotIA;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +27,7 @@ use App\Http\Controllers\CustomFieldController;
 use App\Http\Controllers\AplicacionesController;
 use App\Http\Controllers\EstadisticasController;
 use App\Http\Controllers\ProgramadosControllers;
+use App\Http\Controllers\NewsletterController;
 
 Route::resource(
     'aplicaciones',
@@ -179,6 +181,11 @@ Route::post('/groups/{group}/add-recipient', [GroupController::class, 'addRecipi
 Route::delete('/groups/{group}/remove-recipient/{recipient}', [GroupController::class, 'removeRecipient'])->name('groups.removeRecipient');
 Route::get('/groups/{group}/recipients/{recipient}/edit', [GroupController::class, 'editRecipient'])->name('groups.editRecipient');
 Route::put('/groups/{group}/recipients/{recipient}', [GroupController::class, 'updateRecipient'])->name('groups.updateRecipient');
+
+// Newsletters
+Route::post('newsletters/{newsletter}/send-test', [NewsletterController::class, 'sendTest'])->name('newsletters.sendTest');
+Route::post('newsletters/{newsletter}/send', [NewsletterController::class, 'send'])->name('newsletters.send');
+Route::resource('newsletters', NewsletterController::class);
 // -------------------------------------------
 // bot
 Route::resource(

@@ -7,6 +7,22 @@
 @stop
 
 @section('content')
+    <div class="alert alert-info alert-dismissible fade show" role="alert">
+        <strong>¡Información Importante!</strong>
+        Los contactos para hacer envíos de correos electrónicos se pueden seleccionar desde las
+        <a href="{{ route('tags.index') }}" class="alert-link">etiquetas ya creadas</a>.
+        Solo los contactos que tengan un correo registrado serán adjuntados para el envío.
+        <br><br>
+        Si necesitas agregar un nuevo contacto, puedes hacerlo desde la sección de
+        <a href="{{ route('contactos.index') }}" class="alert-link">contactos</a>.
+        <br><br>
+        <strong>Solo se debera crear grupos.</strong> Si un contacto no tiene un número de celular único,
+        por favor verifica su información antes de continuar.
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    </div>
+
     <div class="container">
         <div class="card shadow-sm">
             <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
@@ -45,8 +61,7 @@
                                     <a href="{{ route('groups.edit', $group->id) }}" class="btn btn-success btn-sm">
                                         Editar
                                     </a>
-                                    <button class="btn btn-danger btn-sm delete-group-btn"
-                                        data-id="{{ $group->id }}"
+                                    <button class="btn btn-danger btn-sm delete-group-btn" data-id="{{ $group->id }}"
                                         data-url="{{ route('groups.destroy', $group->id) }}">
                                         Eliminar
                                     </button>

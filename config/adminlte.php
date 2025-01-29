@@ -309,6 +309,38 @@ return [
             'url' => 'admin/blog',
             'can' => 'manage-blog',
         ],
+        // Contactos Section
+        [
+            'text' => 'Contactos',
+            'icon' => 'fas fa-fw fa-user',
+            'submenu' => [
+                [
+                    'text' => 'Contactos',
+                    'route' => 'contact.index',
+                    'can' => 'contactos.index',
+                    'icon' => 'fas fa-fw fa-users',
+                    'target' => '_blank', // Esta clave abre el enlace en una nueva pestaña
+                ],
+                [
+                    'text' => 'New - export - import',
+                    'route' => 'contactos.index',
+                    'can' => 'contactos.index',
+                    'icon' => 'fas fa-fw fa-address-book',
+                ],
+                [
+                    'text' => 'Campos personalizados',
+                    'route' => 'custom_fields.index',
+                    'can' => 'custom_fields.index',
+                    'icon' => 'fas fa-fw fa-tags',
+                ],
+                [
+                    'text' => 'Etiquetas',
+                    'route' => 'tags.index',
+                    'can' => 'tags.index',
+                    'icon' => 'fas fa-fw fa-tags',
+                ],
+            ],
+        ],
         [
             'text' => 'Gestión WhatsApp',
             'icon' => 'fas fa-fw fa-layer-group',
@@ -348,31 +380,6 @@ return [
                             'route' => 'solicitudes',
                             'can' => 'solicitudes',
                             'icon' => 'fab fa-fw fa-readme',
-                        ],
-                    ],
-                ],
-                // Contactos Section
-                [
-                    'text' => 'Contactos',
-                    'icon' => 'fas fa-fw fa-user',
-                    'submenu' => [
-                        [
-                            'text' => 'Agenda',
-                            'route' => 'contactos.index',
-                            'can' => 'contactos.index',
-                            'icon' => 'fas fa-fw fa-users',
-                        ],
-                        [
-                            'text' => 'Campos personalizados',
-                            'route' => 'custom_fields.index',
-                            'can' => 'custom_fields.index',
-                            'icon' => 'fas fa-fw fa-tags',
-                        ],
-                        [
-                            'text' => 'Etiquetas',
-                            'route' => 'tags.index',
-                            'can' => 'tags.index',
-                            'icon' => 'fas fa-fw fa-tags',
                         ],
                     ],
                 ],
@@ -432,6 +439,42 @@ return [
             ],
         ],
         [
+            'text' => 'Gestión Correos',
+            'icon' => 'fas fa-fw fa-envelope-open-text', // Puedes cambiar el ícono
+            'submenu' => [
+                [
+                    'text' => 'Grupos Mails',
+                    'route' => 'groups.index',
+                    'icon' => 'fas fa-fw fa-users',
+                ],
+                [
+                    'text' => 'Boletines',
+                    'route' => 'newsletters.index',
+                    'icon' => 'fas fa-fw fa-newspaper',
+                ],
+                [
+                    'text' => 'Estadisticas',
+                    'route' => 'programados',
+                    'icon' => 'fas fa-fw fa-poll',
+                ],
+                [
+                    'text' => 'Reportes',
+                    'route' => 'programados',
+                    'icon' => 'fas fa-fw fa-chart-bar',
+                ],
+                [
+                    'text' => 'Busqueda de mails',
+                    'route' => 'programados',
+                    'icon' => 'fas fa-fw fa-search',
+                ],
+                [
+                    'text' => 'Mails Bloqueados',
+                    'route' => 'programados',
+                    'icon' => 'fas fa-fw fa-inbox',
+                ],
+            ],
+        ],
+        [
             'text' => 'Administración',
             'icon' => 'fas fa-fw fa-cogs',
             'submenu' => [
@@ -461,43 +504,6 @@ return [
                 ],
             ],
         ],
-        [
-            'text' => 'Gestión Correos',
-            'icon' => 'fas fa-fw fa-envelope-open-text', // Puedes cambiar el ícono
-            'submenu' => [
-                [
-                    'text' => 'Grupos Mails',
-                    'route' => 'groups.index',
-                    'icon' => 'fas fa-fw fa-users',
-                ],
-                [
-                    'text' => 'Boletines',
-                    'route' => 'plantillas',
-                    'icon' => 'fas fa-fw fa-newspaper',
-                ],
-                [
-                    'text' => 'Estadisticas',
-                    'route' => 'programados',
-                    'icon' => 'fas fa-fw fa-poll',
-                ],
-                [
-                    'text' => 'Reportes',
-                    'route' => 'programados',
-                    'icon' => 'fas fa-fw fa-chart-bar',
-                ],
-                [
-                    'text' => 'Busqueda de mails',
-                    'route' => 'programados',
-                    'icon' => 'fas fa-fw fa-search',
-                ],
-                [
-                    'text' => 'Mails Bloqueados',
-                    'route' => 'programados',
-                    'icon' => 'fas fa-fw fa-inbox',
-                ],
-            ],
-        ],
-
     ],
 
     /*
@@ -652,5 +658,5 @@ return [
     |
     */
 
-    'livewire' => false,
+    'livewire' => true,
 ];

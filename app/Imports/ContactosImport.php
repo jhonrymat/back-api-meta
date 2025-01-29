@@ -16,6 +16,8 @@ use Maatwebsite\Excel\Concerns\WithValidation;
 use Maatwebsite\Excel\Concerns\WithBatchInserts;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithCustomCsvSettings;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBatchInserts, WithChunkReading, WithCustomCsvSettings
 {
@@ -46,85 +48,83 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
     public function model(array $row)
     {
         $user = $this->user;
+
+        // Obtener el número de fila actual
+        static $rowIndex = 1;
+        $currentRow = $rowIndex++;
+
+        // Validar que las etiquetas existen antes de procesar el contacto
+        if (!empty($row['tags'])) {
+            $tagNames = explode(',', $row['tags']);
+            $invalidTags = [];
+
+            foreach ($tagNames as $tagName) {
+                $tagNameTrimmed = trim($tagName);
+                if (!Tag::where('nombre', $tagNameTrimmed)->exists()) {
+                    $invalidTags[] = $tagNameTrimmed;
+                }
+            }
+
+            // Si hay etiquetas inexistentes, lanzar error con la fila correspondiente
+            if (!empty($invalidTags)) {
+                $validator = Validator::make([], []);
+                $validator->errors()->add("Fila {$currentRow}", "Las siguientes etiquetas no existen en la fila {$currentRow}: " . implode(', ', $invalidTags));
+
+                throw ValidationException::withMessages($validator->errors()->toArray());
+            }
+        }
+
+        // 📌 **Validar que el teléfono no esté duplicado**
         $contacto = Contacto::where('telefono', $row['telefono'])->first();
 
         if ($contacto) {
-            // Si el contacto ya existe, verificar si el usuario actual ya lo tiene asociado
+            // ✅ Si el contacto ya existe, verificar si el usuario ya lo tiene asociado
             if (!$user->contactos->contains($contacto->id)) {
-                // Asociar el contacto existente con el usuario actual en user_contacts
-                $userContact = new UserContact();
-                $userContact->user_id = $user->id;
-                $userContact->contacto_id = $contacto->id;
-                $userContact->save();
+                UserContact::create([
+                    'user_id' => $user->id,
+                    'contacto_id' => $contacto->id,
+                ]);
+            } else {
+                // ⚠️ Si el contacto ya está registrado para el usuario, lanzar una excepción
+                $validator = Validator::make([], []);
+                $validator->errors()->add("Fila {$currentRow}", "El teléfono {$row['telefono']} ya está registrado en la fila {$currentRow}.");
+
+                throw ValidationException::withMessages($validator->errors()->toArray());
             }
         } else {
-            // Si no existe, crear un nuevo contacto
-            $contacto = Contacto::create([
-                'nombre' => $row['nombre'],
-                'apellido' => $row['apellido'],
-                'correo' => $row['correo'],
-                'telefono' => $row['telefono'],
-                "notas" => $row['notas'],
-            ]);
+            // ✅ Si el contacto no existe, lo creamos
+            try {
+                $contacto = Contacto::create([
+                    'nombre' => $row['nombre'],
+                    'apellido' => $row['apellido'],
+                    'correo' => $row['correo'],
+                    'telefono' => $row['telefono'],
+                    "notas" => $row['notas'],
+                ]);
 
-            // Asociar el nuevo contacto con el usuario autenticado en user_contacts
-            $userContact = new UserContact();
-            $userContact->user_id = $user->id;
-            $userContact->contacto_id = $contacto->id;
-            $userContact->save();
+                // Asociar el contacto al usuario autenticado
+                UserContact::create([
+                    'user_id' => $user->id,
+                    'contacto_id' => $contacto->id,
+                ]);
+            } catch (\Exception $e) {
+                // ⚠️ Si ocurre un error de duplicado de teléfono, lanzar un error de validación
+                $validator = Validator::make([], []);
+                $validator->errors()->add("Fila {$currentRow}", "Error: el teléfono {$row['telefono']} ya existe en la base de datos.");
+
+                throw ValidationException::withMessages($validator->errors()->toArray());
+            }
         }
 
-        // Si 'tags' está presente y no es nulo
+        // ✅ Asociar etiquetas existentes al contacto
         if (!empty($row['tags'])) {
-            // Separar los nombres de tags y encontrar/crear los tags
-            $tagNames = explode(',', $row['tags']);
-            $tagIds = [];
-
-            foreach ($tagNames as $tagName) {
-                // Asegurarse de que no haya espacios extra alrededor del nombre del tag
-                $tagNameTrimmed = trim($tagName);
-
-                // Encontrar o crear el Tag basado en el nombre
-                $tag = Tag::firstOrCreate(['nombre' => $tagNameTrimmed]);
-                $tagIds[] = $tag->id;
-            }
-
-            // Asociar los tags al contacto
+            $tagIds = Tag::whereIn('nombre', $tagNames)->pluck('id')->toArray();
             $contacto->tags()->syncWithoutDetaching($tagIds);
         }
-
-        // Manejar campos personalizados si están presentes
-        foreach ($row as $key => $value) {
-            $normalizedKey = $this->normalizeName($key); // Normalizar el nombre del campo
-
-            if (isset($this->customFieldMap[$normalizedKey])) {
-                $customFieldId = $this->customFieldMap[$normalizedKey];
-
-                // Verificar si el valor está presente
-                if (!is_null($value) && $value !== '') {
-                    Log::info('Updating Custom Field:', ['contacto_id' => $contacto->id, 'custom_field_id' => $customFieldId, 'value' => $value]); // Agrega esta línea para depuración
-
-                    $customFieldValue = CustomFieldValue::updateOrCreate(
-                        ['contacto_id' => $contacto->id, 'custom_field_id' => $customFieldId],
-                        ['value' => $value]
-                    );
-
-                    // Verificar si el registro se creó o actualizó correctamente
-                    if ($customFieldValue->wasRecentlyCreated || $customFieldValue->wasChanged()) {
-                        Log::info('Custom Field Value Created/Updated Successfully:', $customFieldValue->toArray());
-                    } else {
-                        Log::error('Failed to Create/Update Custom Field Value:', ['contacto_id' => $contacto->id, 'custom_field_id' => $customFieldId]);
-                    }
-                } else {
-                    Log::info('Skipping Custom Field Update due to empty value:', ['contacto_id' => $contacto->id, 'custom_field_id' => $customFieldId, 'key' => $key]);
-                }
-            } else {
-                Log::warning('Custom Field Key Not Found in Map:', ['key' => $key, 'normalizedKey' => $normalizedKey]);
-            }
-        }
-
-
     }
+
+
+
 
     public function batchSize(): int
     {
