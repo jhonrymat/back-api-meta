@@ -19,4 +19,9 @@ class Group extends Model
             ->orderBy('user_emails.created_at', 'desc');
     }
 
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
 }

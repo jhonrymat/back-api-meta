@@ -10,8 +10,6 @@
     @endif
     <div class="card shadow-lg">
         {{-- boton Maddigo volver a /home --}}
-
-
         <div class="card-header bg-primary text-white d-flex align-items-center justify-content-between">
             <!-- Botón Volver a Inicio -->
             <a href="{{ route('home') }}" class="btn btn-info btn-sm" style="color: white;">
@@ -27,11 +25,6 @@
                 @livewire('contactos-datatable')
             </div>
         </div>
-        {{-- @include('./livewire.contactos.modals.crud-modal') --}}
-        {{-- @include('./livewire.contactos.modals.create-modal') --}}
-        {{-- @include('./livewire.contactos.modals.delete-modal') --}}
-        {{-- @include('./livewire.contactos.modals.import-modal')
-            @include('./livewire.contactos.modals.export-modal') --}}
     </div>
     <!-- Modal para Editar -->
     @if ($showEditModal)
@@ -50,6 +43,12 @@
                         <input type="text" wire:model.defer="telefono" class="form-control mb-2"
                             placeholder="Teléfono">
                         <textarea wire:model.defer="notas" class="form-control mb-2" placeholder="Notas"></textarea>
+                        {{-- etiqueta --}}
+                        <select wire:model.defer="tagsSeleccionados" class="form-control mb-2" multiple>
+                            @foreach ($tags as $tag)
+                                <option value="{{ $tag->id }}">{{ $tag->nombre }}</option>
+                            @endforeach
+                        </select>
                     </div>
                     <div class="modal-footer">
                         <button class="btn btn-secondary" wire:click="$set('showEditModal', false)">Cancelar</button>
@@ -59,7 +58,7 @@
             </div>
         </div>
     @endif
-    <!-- Modal para Eliminar -->
+
     @if ($showDeleteModal)
         <div class="modal fade show" style="display: block;">
             <div class="modal-dialog">
@@ -79,4 +78,5 @@
             </div>
         </div>
     @endif
+    <x-sweet-alert-good></x-sweet-alert-good>
 </div>

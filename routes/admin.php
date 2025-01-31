@@ -1,10 +1,10 @@
 <?php
 
-use App\Livewire\ContactoComponent;
 use App\Models\Reporte;
 use App\Http\Controllers\BotIA;
 use Illuminate\Support\Facades\DB;
 use OpenAI\Laravel\Facades\OpenAI;
+use App\Livewire\ContactoComponent;
 // use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\BotController;
@@ -23,11 +23,12 @@ use App\Http\Controllers\NumerosController;
 use App\Http\Controllers\PermisoController;
 use App\Http\Controllers\ContactoController;
 use App\Http\Controllers\ErrorLogController;
+use App\Http\Controllers\NewsletterController;
 use App\Http\Controllers\CustomFieldController;
 use App\Http\Controllers\AplicacionesController;
 use App\Http\Controllers\EstadisticasController;
 use App\Http\Controllers\ProgramadosControllers;
-use App\Http\Controllers\NewsletterController;
+use App\Http\Controllers\EmailTemplateController;
 
 Route::resource(
     'aplicaciones',
@@ -186,6 +187,17 @@ Route::put('/groups/{group}/recipients/{recipient}', [GroupController::class, 'u
 Route::post('newsletters/{newsletter}/send-test', [NewsletterController::class, 'sendTest'])->name('newsletters.sendTest');
 Route::post('newsletters/{newsletter}/send', [NewsletterController::class, 'send'])->name('newsletters.send');
 Route::resource('newsletters', NewsletterController::class);
+
+// Genera todas las rutas necesarias para el recurso EmailTemplate
+Route::get('email-templates', [EmailTemplateController::class, 'index'])->name('email-templates.index');
+Route::get('email-templates/create', [EmailTemplateController::class, 'create'])->name('email-templates.create');
+Route::post('email-templates', [EmailTemplateController::class, 'store'])->name('email-templates.store');
+// Route::get('email-templates/{email_template}', [EmailTemplateController::class, 'show'])->name('email-templates.show');
+Route::get('/email/preview', [EmailTemplateController::class, 'previewEmail'])->name('email.preview');
+Route::get('email-templates/{email_template}/edit', [EmailTemplateController::class, 'edit'])->name('email-templates.edit');
+Route::put('email-templates/{email_template}', [EmailTemplateController::class, 'update'])->name('email-templates.update');
+Route::delete('email-templates/{email_template}', [EmailTemplateController::class, 'destroy'])->name('email-templates.destroy');
+
 // -------------------------------------------
 // bot
 Route::resource(

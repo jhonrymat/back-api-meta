@@ -453,6 +453,11 @@ return [
                     'icon' => 'fas fa-fw fa-newspaper',
                 ],
                 [
+                    'text' => 'Plantillas',
+                    'route' => 'email-templates.index',
+                    'icon' => 'fas fa-fw fa-file-invoice',
+                ],
+                [
                     'text' => 'Estadisticas',
                     'route' => 'programados',
                     'icon' => 'fas fa-fw fa-poll',

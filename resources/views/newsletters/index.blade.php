@@ -98,6 +98,15 @@
                             <input type="email" name="test_email" id="test_email" class="form-control"
                                 placeholder="Ingresa un correo" required>
                         </div>
+                        <div class="form-group mb-3">
+                            <label for="email_template_id">Seleccionar Plantilla</label>
+                            <select name="email_template_id" id="email_template_id" class="form-control" required>
+                                <option value="">Seleccione una plantilla</option>
+                                @foreach ($emailTemplates as $template)
+                                    <option value="{{ $template->id }}">{{ $template->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>

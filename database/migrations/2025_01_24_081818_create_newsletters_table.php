@@ -11,6 +11,7 @@ return new class extends Migration
     {
         Schema::create('newsletters', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');   
             $table->string('name'); // Nombre del boletín
             $table->string('subject'); // Asunto del correo
             $table->string('copy_email')->nullable(); // Correo de copia (opcional)

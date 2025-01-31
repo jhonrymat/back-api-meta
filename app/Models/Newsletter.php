@@ -26,4 +26,9 @@ class Newsletter extends Model
     {
         return $this->belongsToMany(Tag::class, 'tag_newsletter');
     }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

@@ -13,9 +13,8 @@ class ContactoComponent extends Component
     public $nombre, $apellido, $correo, $telefono, $notas, $tagsSeleccionados = [];
     public $showEditModal = false; // Control del modal de edición
     public $showDeleteModal = false; // Control del modal de eliminación
-    public $message = '¡Hola desde Livewire!';
 
-    protected $listeners = ['edit', 'delete'];
+    protected $listeners = ['edit', 'showDelete'];
     protected $rules = [
         'nombre' => 'required|string|max:255',
         'apellido' => 'nullable|string|max:255',
@@ -29,15 +28,12 @@ class ContactoComponent extends Component
     {
         // Verifica si el usuario no está autenticado
         if (!auth()->check()) {
-            return redirect('/login'); // Redirige al usuario no autenticado
+            return response()->redirectTo(route('home'));
         }
 
         $user = auth()->user(); // Obtén el usuario autenticado
         $this->tags = $user->tags()->get(); // Obtén los tags relacionados
         $this->customFields = $user->customFields()->get(); // Obtén los campos personalizados relacionados
-    }
-    public function create()
-    {
     }
     public function edit($Id)
     {
@@ -48,15 +44,12 @@ class ContactoComponent extends Component
         $this->correo = $contacto->correo;
         $this->telefono = $contacto->telefono;
         $this->notas = $contacto->notas;
-        $this->tagsSeleccionados = $contacto->tags->pluck('id')->toArray();
+        // Obtener la primera etiqueta del contacto (ajústalo si es necesario)
+        $this->tagsSeleccionados = $contacto->tags()->pluck('tags.id')->toArray();
         $this->showEditModal = true;
     }
 
 
-    public function updateMessage()
-    {
-        $this->message = 'Mensaje actualizado en tiempo real.';
-    }
     public function update()
     {
         $this->validate();
@@ -70,7 +63,8 @@ class ContactoComponent extends Component
         ]);
         $contacto->tags()->sync($this->tagsSeleccionados);
         $this->resetModal();
-        $this->dispatch('toast', ['type' => 'success', 'message' => 'Contacto actualizado correctamente']);
+        $this->dispatch('Updated');
+        $this->dispatch('sweet-alert-good', icon: 'success', title: 'Exito.!', text: 'Contacto actualizado correctamente.');
     }
     public function showDelete($Id)
     {
@@ -83,15 +77,17 @@ class ContactoComponent extends Component
         $contacto->tags()->detach();
         $contacto->delete();
         $this->resetModal();
-        $this->dispatch('toast', ['type' => 'success', 'message' => 'Contacto eliminado correctamente']);
+        $this->dispatch('Updated');
+        $this->dispatch('sweet-alert-good', icon: 'success', title: 'Exito.!', text: 'Contacto eliminado correctamente.');
     }
     private function resetModal()
     {
         $this->reset(['selectedId', 'nombre', 'apellido', 'correo', 'telefono', 'notas', 'tagsSeleccionados', 'showEditModal', 'showDeleteModal']);
+        $this->resetValidation();
     }
     public function render()
     {
-        
+
         return view('livewire.contacto-component', [
             'tags' => $this->tags, // Opcional: pasar tags a la vista
             'customFields' => $this->customFields, // Opcional: pasar campos personalizados a la vista

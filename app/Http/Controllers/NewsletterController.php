@@ -5,6 +5,7 @@ use App\Models\User;
 use App\Models\Group;
 use App\Models\Newsletter;
 use Illuminate\Http\Request;
+use App\Models\EmailTemplate;
 use App\Jobs\SendNewsletterJob;
 use App\Mail\NewsletterTestMail;
 use Illuminate\Support\Facades\Log;
@@ -15,14 +16,17 @@ class NewsletterController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Newsletter::query();
-        // Filtro por nombre (si aplica)
+        $query = Newsletter::where('user_id', Auth::id()); // Filtrar por el usuario autenticado
+
         if ($request->filled('search')) {
             $query->where('name', 'like', '%' . $request->search . '%');
         }
-        // Paginación (10 boletines por página)
+
         $newsletters = $query->paginate(10);
-        return view('newsletters.index', compact('newsletters'));
+
+        $emailTemplates = EmailTemplate::where('user_id', Auth::id())->get();
+
+        return view('newsletters.index', compact('newsletters', 'emailTemplates'));
     }
     public function create()
     {
@@ -34,7 +38,8 @@ class NewsletterController extends Controller
         }
         $tags = $user->tags()->get();
 
-        $groups = Group::all();
+        $groups = $user->groups()->get();
+
         return view('newsletters.create', compact('groups', 'tags'));
     }
     public function store(Request $request)
@@ -52,6 +57,7 @@ class NewsletterController extends Controller
         ]);
 
         $newsletter = new Newsletter($validated);
+        $newsletter->user_id = Auth::id();
         $newsletter->save();
 
         // Sincronizar grupos seleccionados
@@ -79,13 +85,22 @@ class NewsletterController extends Controller
 
     public function edit(Newsletter $newsletter)
     {
-        $groups = Group::all();
-        $tags = Auth::user()->tags()->get(); // Obtener etiquetas asociadas al usuario
+        if ($newsletter->user_id !== Auth::id()) {
+            abort(403, 'No tienes permiso para editar este boletín.');
+        }
+
+        $groups = Auth::user()->groups()->get();
+        $tags = Auth::user()->tags()->get();
+
         return view('newsletters.edit', compact('newsletter', 'groups', 'tags'));
     }
 
     public function update(Request $request, Newsletter $newsletter)
     {
+        if ($newsletter->user_id !== Auth::id()) {
+            abort(403, 'No tienes permiso para actualizar este boletín.');
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'subject' => 'required|string|max:255',
@@ -137,6 +152,9 @@ class NewsletterController extends Controller
 
     public function destroy(Newsletter $newsletter)
     {
+        if ($newsletter->user_id !== Auth::id()) {
+            abort(403, 'No tienes permiso para eliminar este boletín.');
+        }
         // Verificar y eliminar el archivo adjunto si existe
         if ($newsletter->attachment_path) {
             \Storage::disk('public')->delete($newsletter->attachment_path);
@@ -156,23 +174,28 @@ class NewsletterController extends Controller
         $request->validate([
             'test_email' => 'required|email', // Validar el correo ingresado
             'test_name' => 'required|string',
+            'email_template_id' => 'required|exists:email_templates,id',
         ]);
 
         $testEmail = $request->test_email;
         $testName = $request->test_name;
 
-        // Generar contenido con variables dinámicas reemplazadas para prueba
+        // Obtener la plantilla personalizada seleccionada
+        $emailTemplate = EmailTemplate::findOrFail($request->email_template_id);
+
+        // Reemplazar variables dinámicas dentro del contenido del boletín
         $content = str_replace(
             ['{{nombre}}', '{{email}}'],
-            [$testName, $testEmail], 
+            [$testName, $testEmail],
             $newsletter->content
         );
 
-        // Enviar correo usando colas con el contenido dinámico generado
-        Mail::to($testEmail)->send(new NewsletterTestMail($newsletter, $content));
+        // Enviar el correo usando colas con la plantilla generada
+        Mail::to($testEmail)->send(new NewsletterTestMail($newsletter, $content, $emailTemplate));
 
         return redirect()->route('newsletters.index')->with('success', 'El boletín de prueba se envió correctamente.');
     }
+
 
     public function send(Request $request, Newsletter $newsletter)
     {

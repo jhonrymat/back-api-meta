@@ -6,15 +6,18 @@ use App\Models\Group;
 use App\Models\UserEmail;
 use App\Jobs\SendEmailJob;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 
 
 class GroupController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Group::query();
+        $user = Auth::user();
+        $query = Group::where('user_id', $user->id); // Filtra los grupos del usuario autenticado
+
 
         // Verifica si hay un término de búsqueda
         if ($request->has('search') && $request->search) {
@@ -27,6 +30,10 @@ class GroupController extends Controller
         return view('groups.index', compact('groups'));
     }
 
+    public function create()
+    {
+        return view('groups.create');
+    }
 
     public function store(Request $request)
     {
@@ -34,19 +41,20 @@ class GroupController extends Controller
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
         ]);
-        $group = Group::create($validated);
-        return redirect()->back()->with('success', 'Grupo creado correctamente.');
+
+        $user = Auth::user();
+
+        $group = new Group($validated);
+        $group->user_id = $user->id; // Asigna el grupo al usuario autenticado
+        $group->save();
+        return redirect()->route('groups.index')->with('success', 'Grupo creado correctamente.');
     }
 
-    public function create()
-    {
-        return view('groups.create');
-    }
 
     public function edit($id)
     {
-        $group = Group::findOrFail($id); // Busca el grupo por ID o lanza un error 404
-        return view('groups.edit', compact('group')); // Retorna la vista para editar
+        $group = Group::where('id', $id)->where('user_id', Auth::id())->firstOrFail(); // Verifica que el grupo pertenezca al usuario
+        return view('groups.edit', compact('group'));
     }
 
     public function update(Request $request, $id)
@@ -56,25 +64,31 @@ class GroupController extends Controller
             'description' => 'nullable|string',
         ]);
 
-        $group = Group::findOrFail($id);
+        $group = Group::where('id', $id)->where('user_id', Auth::id())->firstOrFail(); // Asegurar que el grupo es del usuario
         $group->update($validated);
 
         return redirect()->route('groups.index')->with('success', 'Grupo actualizado correctamente.');
     }
 
+    public function destroy($id)
+    {
+        $group = Group::where('id', $id)->where('user_id', Auth::id())->firstOrFail();
+        $group->delete();
+
+        return redirect()->route('groups.index')->with('success', 'Grupo eliminado correctamente.');
+    }
+
     public function showEmails($id, Request $request)
     {
-        $group = Group::findOrFail($id);
+        $group = Group::where('id', $id)->where('user_id', Auth::id())->firstOrFail();
 
-        // Filtrar por búsqueda si se envía una consulta
         $query = $group->userEmails();
 
-        if ($request->has('search') && $request->search) {
+        if ($request->filled('search')) {
             $query->where('email', 'like', '%' . $request->search . '%')
                 ->orWhere('name', 'like', '%' . $request->search . '%');
         }
 
-        // Paginación (20 por página)
         $recipients = $query->paginate(20);
 
         return view('groups.emails', compact('group', 'recipients'));
@@ -174,7 +188,7 @@ class GroupController extends Controller
 
     public function editRecipient($groupId, $recipientId)
     {
-        $group = Group::findOrFail($groupId);
+        $group = Group::where('id', $groupId)->where('user_id', Auth::id())->firstOrFail();
         $recipient = UserEmail::findOrFail($recipientId);
 
         return view('groups.editRecipient', compact('group', 'recipient'));
@@ -182,6 +196,8 @@ class GroupController extends Controller
 
     public function updateRecipient(Request $request, $groupId, $recipientId)
     {
+        $group = Group::where('id', $groupId)->where('user_id', Auth::id())->firstOrFail();
+
         $validated = $request->validate([
             'name' => 'nullable|string|max:255',
             'email' => 'required|email|unique:user_emails,email,' . $recipientId,
@@ -195,13 +211,10 @@ class GroupController extends Controller
 
     public function removeRecipient($groupId, $recipientId)
     {
-        $group = Group::findOrFail($groupId);
+        $group = Group::where('id', $groupId)->where('user_id', Auth::id())->firstOrFail();
         $recipient = UserEmail::findOrFail($recipientId);
 
-        // Elimina la relación entre el grupo y el destinatario
         $group->userEmails()->detach($recipient->id);
-
-        // Si quieres eliminar también al destinatario del sistema completamente:
         $recipient->delete();
 
         return redirect()->back()->with('success', 'Destinatario eliminado del grupo.');

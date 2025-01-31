@@ -18,5 +18,8 @@ class VerifyCsrfToken extends Middleware
         '/check-session',
         '/ask-bot-embedded',
         '/admin/ask-bot-embedded',
+        '/livewire/*',
+        '/contact',
+        '/livewire/update', // Excluir actualización de Livewire
     ];
 }

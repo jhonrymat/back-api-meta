@@ -79,7 +79,7 @@
             ['para', ['ul', 'ol', 'paragraph']],
             ['insert', ['link', 'table', 'hr']],
             ['custom', ['variables']],
-            ['view', ['fullscreen', 'codeview', 'help']]
+            ['view', ['codeview', 'help']]
         ],
         buttons: {
             variables: function (context) {
