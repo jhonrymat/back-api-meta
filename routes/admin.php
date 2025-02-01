@@ -187,6 +187,7 @@ Route::put('/groups/{group}/recipients/{recipient}', [GroupController::class, 'u
 Route::post('newsletters/{newsletter}/send-test', [NewsletterController::class, 'sendTest'])->name('newsletters.sendTest');
 Route::post('newsletters/{newsletter}/send', [NewsletterController::class, 'send'])->name('newsletters.send');
 Route::resource('newsletters', NewsletterController::class);
+Route::get('newsletters/{newsletter}/recipients/count', [NewsletterController::class, 'countRecipients']);
 
 // Genera todas las rutas necesarias para el recurso EmailTemplate
 Route::get('email-templates', [EmailTemplateController::class, 'index'])->name('email-templates.index');

@@ -196,24 +196,12 @@ class MessageController extends Controller
         }
     }
 
-    /**
-     * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Models\Message  $message
-     * @return \Illuminate\Http\Response
-     */
+
     public function update(Request $request, Message $message)
     {
         //
     }
 
-    /**
-     * Remove the specified resource from storage.
-     *
-     * @param  \App\Models\Message  $message
-     * @return \Illuminate\Http\Response
-     */
     public function destroy(Message $message)
     {
         //

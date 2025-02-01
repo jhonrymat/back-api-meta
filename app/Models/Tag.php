@@ -15,6 +15,7 @@ class Tag extends Model
         return $this->belongsToMany(Contacto::class, 'contacto_tag', 'tag_id', 'contacto_id');
     }
 
+
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');

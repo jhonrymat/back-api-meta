@@ -19,7 +19,7 @@ class Newsletter extends Model
     }
     public function groups()
     {
-        return $this->belongsToMany(Group::class);
+        return $this->belongsToMany(Group::class, 'group_newsletter');
     }
 
     public function tags()
@@ -31,4 +31,27 @@ class Newsletter extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    public function getRecipients()
+    {
+        $groupRecipients = $this->groups->flatMap(function ($group) {
+            return $group->userEmails;
+        });
+
+        $tagRecipients = $this->tags->flatMap(fn ($tag) => $tag->contactos->map(function ($contacto) {
+            return (object) [
+                'name' => $contacto->nombre,
+                'email' => $contacto->correo,
+            ];
+        }));
+
+        return $groupRecipients
+            ->merge($tagRecipients)
+            ->filter(fn($recipient) => !empty($recipient->email))
+            ->unique('email');
+    }
+
+
+
+
 }

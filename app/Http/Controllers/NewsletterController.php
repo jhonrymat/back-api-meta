@@ -171,47 +171,79 @@ class NewsletterController extends Controller
     }
     public function sendTest(Request $request, Newsletter $newsletter)
     {
-        $request->validate([
-            'test_email' => 'required|email', // Validar el correo ingresado
-            'test_name' => 'required|string',
-            'email_template_id' => 'required|exists:email_templates,id',
-        ]);
+        [$emailTemplate, $recipients] = $this->prepareNewsletterData($request, $newsletter);
 
-        $testEmail = $request->test_email;
-        $testName = $request->test_name;
+        $testEmail = $request->validate(['test_email' => 'required|email'])['test_email'];
+        $testName = $request->validate(['test_name' => 'required|string'])['test_name'];
 
-        // Obtener la plantilla personalizada seleccionada
-        $emailTemplate = EmailTemplate::findOrFail($request->email_template_id);
-
-        // Reemplazar variables dinámicas dentro del contenido del boletín
         $content = str_replace(
             ['{{nombre}}', '{{email}}'],
             [$testName, $testEmail],
             $newsletter->content
         );
 
-        // Enviar el correo usando colas con la plantilla generada
         Mail::to($testEmail)->send(new NewsletterTestMail($newsletter, $content, $emailTemplate));
 
         return redirect()->route('newsletters.index')->with('success', 'El boletín de prueba se envió correctamente.');
     }
 
 
+
+
     public function send(Request $request, Newsletter $newsletter)
     {
+        Log::info("Preparando envío de boletín...");
+        [$emailTemplate, $recipients] = $this->prepareNewsletterData($request, $newsletter);
+        Log::info("Destinatarios obtenidos: " . count($recipients));
         $validated = $request->validate([
             'send_type' => 'required|in:immediate,scheduled',
             'scheduled_date' => 'nullable|date|after:now',
         ]);
-        if ($validated['send_type'] === 'immediate') {
-            // Enviar inmediatamente
-            dispatch(new SendNewsletterJob($newsletter));
-            return redirect()->route('newsletters.index')->with('success', 'El boletín se está enviando.');
-        } else {
-            // Programar envío
-            $scheduledDate = Carbon::parse($validated['scheduled_date']);
-            dispatch(new SendNewsletterJob($newsletter))->delay($scheduledDate);
-            return redirect()->route('newsletters.index')->with('success', 'El boletín ha sido programado.');
+
+        $sendType = $validated['send_type'];
+
+        foreach ($recipients as $recipient) {
+            Log::info("Encolando envío para: " . $recipient->email);
+            $job = new SendNewsletterJob($newsletter, $emailTemplate, $recipient);
+
+            if ($sendType === 'scheduled') {
+                $scheduledDate = Carbon::parse($validated['scheduled_date']);
+                dispatch($job)->delay($scheduledDate);
+            } else {
+                dispatch($job);
+            }
         }
+        Log::info("Todos los correos han sido encolados correctamente.");
+
+        return redirect()->route('newsletters.index')->with(
+            'success',
+            $sendType === 'scheduled'
+            ? 'El boletín ha sido programado.'
+            : 'El boletín se está enviando.'
+        );
     }
+
+
+
+    public function countRecipients(Newsletter $newsletter)
+    {
+        return response()->json(['count' => $newsletter->getRecipients()->count()]);
+    }
+
+    private function prepareNewsletterData(Request $request, Newsletter $newsletter)
+    {
+        $request->validate([
+            'email_template_id' => 'required|exists:email_templates,id',
+        ]);
+
+        $emailTemplate = EmailTemplate::findOrFail($request->email_template_id);
+        $recipients = $newsletter->getRecipients();
+
+        if ($recipients->isEmpty()) {
+            return redirect()->back()->with('warning', 'No hay destinatarios para este boletín.');
+        }
+
+        return [$emailTemplate, $recipients];
+    }
+
 }

@@ -1,43 +1,47 @@
 <?php
 namespace App\Jobs;
 use App\Models\Newsletter;
+use App\Models\EmailTemplate;
 use Illuminate\Bus\Queueable;
+use App\Mail\NewsletterTestMail;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Queue\SerializesModels;
+use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Mail;
-use App\Mail\NewsletterTestMail;
+
 class SendNewsletterJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-    protected $newsletter;
-    /**
-     * Crear una nueva instancia del job.
-     *
-     * @param Newsletter $newsletter
-     */
-    public function __construct(Newsletter $newsletter)
+    use Dispatchable, Queueable, SerializesModels;
+
+    public $newsletter;
+    public $emailTemplate;
+    public $recipient;
+
+    public function __construct(Newsletter $newsletter, EmailTemplate $emailTemplate, $recipient)
     {
         $this->newsletter = $newsletter;
+        $this->emailTemplate = $emailTemplate;
+        $this->recipient = $recipient;
     }
-    /**
-     * Ejecutar el trabajo.
-     *
-     * @return void
-     */
+
     public function handle()
     {
-        $recipients = $this->newsletter->groups->flatMap->userEmails; // Obtener destinatarios
-        foreach ($recipients as $recipient) {
-            // Reemplazar variables dinámicas
-            $personalizedContent = str_replace(
-                ['{{Nombre}}', '{{Email}}'], // Variables dinámicas
-                [$recipient->name, $recipient->email], // Datos reales del destinatario
-                $this->newsletter->content
-            );
-            // Enviar correo con contenido personalizado
-            Mail::to($recipient->email)->send(new NewsletterTestMail($this->newsletter, $personalizedContent));
+        if (empty($this->recipient->email)) {
+            \Log::warning("Correo no enviado: destinatario sin email. ID: {$this->recipient->id}");
+            return; // Sale sin procesar el envío
         }
+
+        $content = str_replace(
+            ['{{nombre}}', '{{email}}'],
+            [$this->recipient->name ?? 'Usuario', $this->recipient->email],
+            $this->newsletter->content
+        );
+
+        Mail::to($this->recipient->email)->send(
+            new NewsletterTestMail($this->newsletter, $content, $this->emailTemplate)
+        );
+        // Registrar en logs que el correo fue enviado con éxito
+        \Log::info("Correo enviado exitosamente a: {$this->recipient->email}");
     }
 }

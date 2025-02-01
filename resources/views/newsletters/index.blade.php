@@ -53,7 +53,9 @@
                                     </button>
                                     <button class="btn btn-primary btn-sm send-newsletter-btn" data-bs-toggle="modal"
                                         data-bs-target="#sendNewsletterModal"
-                                        data-url="{{ route('newsletters.send', $newsletter->id) }}">
+                                        data-url="{{ route('newsletters.send', $newsletter->id) }}"
+                                        data-groups="{{ json_encode($newsletter->groups->pluck('id')) }}"
+                                        data-tags="{{ json_encode($newsletter->tags->pluck('id')) }}">
                                         Enviar Boletín
                                     </button>
                                     <a href="{{ route('newsletters.edit', $newsletter->id) }}"
@@ -127,27 +129,36 @@
                         <h5 class="modal-title" id="sendNewsletterModalLabel">Enviar Boletín</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
+
                     <div class="modal-body">
-                        <p>¿Cómo deseas enviar este boletín?</p>
+                        <p>Selecciona una plantilla de correo:</p>
+                        <select name="email_template_id" id="email_template_id" class="form-control" required>
+                            <option value="">-- Seleccionar Plantilla --</option>
+                            @foreach ($emailTemplates as $template)
+                                <option value="{{ $template->id }}">{{ $template->name }}</option>
+                            @endforeach
+                        </select>
+
+                        <p class="mt-3">¿Cómo deseas enviar este boletín?</p>
                         <div class="form-check">
-                            <input class="form-check-input" type="radio" name="send_type" id="immediate" value="immediate"
-                                checked>
-                            <label class="form-check-label" for="immediate">
-                                Enviar Inmediatamente
-                            </label>
+                            <input class="form-check-input" type="radio" name="send_type" id="immediate"
+                                value="immediate" checked>
+                            <label class="form-check-label" for="immediate"> Enviar Inmediatamente </label>
                         </div>
                         <div class="form-check">
                             <input class="form-check-input" type="radio" name="send_type" id="scheduled"
                                 value="scheduled">
-                            <label class="form-check-label" for="scheduled">
-                                Programar Envío
-                            </label>
+                            <label class="form-check-label" for="scheduled"> Programar Envío </label>
                         </div>
+
                         <div id="schedule-fields" style="display: none;" class="mt-3">
                             <label for="scheduled_date">Fecha y Hora</label>
                             <input type="datetime-local" name="scheduled_date" id="scheduled_date" class="form-control">
                         </div>
+
+                        <p class="mt-3">Se enviará a <span id="recipient-count">0</span> destinatarios.</p>
                     </div>
+
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                         <button type="submit" class="btn btn-primary">Enviar</button>
@@ -235,20 +246,32 @@
             button.addEventListener('click', function() {
                 const url = this.getAttribute('data-url');
                 document.getElementById('sendNewsletterForm').setAttribute('action', url);
+
+                const groups = JSON.parse(this.getAttribute('data-groups') || '[]');
+                const tags = JSON.parse(this.getAttribute('data-tags') || '[]');
+
+                let recipientCount = 0;
+                groups.forEach(groupId => {
+                    recipientCount += document.querySelector(`#group-${groupId}-count`)
+                        ?.innerText || 0;
+                });
+                tags.forEach(tagId => {
+                    recipientCount += document.querySelector(`#tag-${tagId}-count`)?.innerText || 0;
+                });
+
+                document.getElementById('recipient-count').innerText = recipientCount;
             });
         });
-        const immediateRadio = document.getElementById('immediate');
-        const scheduledRadio = document.getElementById('scheduled');
-        const scheduleFields = document.getElementById('schedule-fields');
-        immediateRadio.addEventListener('change', function() {
-            if (this.checked) {
-                scheduleFields.style.display = 'none';
-            }
-        });
-        scheduledRadio.addEventListener('change', function() {
-            if (this.checked) {
-                scheduleFields.style.display = 'block';
-            }
+        document.querySelector('#sendNewsletterModal').addEventListener('show.bs.modal', function(event) {
+            const newsletterId = event.relatedTarget.getAttribute('data-id');
+            const url = `/newsletters/${newsletterId}/recipients/count`; // Ruta para contar destinatarios
+
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    document.querySelector('#recipient-count').innerText =
+                        `Se enviará a ${data.count} destinatarios.`;
+                });
         });
     </script>
 @endsection
