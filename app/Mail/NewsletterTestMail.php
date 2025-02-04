@@ -35,6 +35,13 @@ class NewsletterTestMail extends Mailable
             ->view('emails.newsletter')
             ->with($viewData);
 
+        // ✅ Agregar newsletter_id en las cabeceras del email correctamente en Laravel 11
+        $email->withSymfonyMessage(function ($message) {
+            $headers = $message->getHeaders();
+            $headers->addTextHeader('X-SES-CONFIGURATION-SET', 'set-ses');
+            $headers->addTextHeader('X-SES-MESSAGE-TAGS', "newsletter_id={$this->newsletter->id}");
+        });
+
         // Adjuntar archivo PDF si existe
         if ($this->newsletter->has_attachment && $this->newsletter->attachment_path) {
             $email->attach(storage_path('app/public/' . $this->newsletter->attachment_path));
@@ -42,6 +49,7 @@ class NewsletterTestMail extends Mailable
 
         return $email;
     }
+
 
     /**
      * Retorna una plantilla predeterminada si el usuario no seleccionó ninguna.
