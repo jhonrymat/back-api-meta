@@ -17,13 +17,16 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule)
     {
         $schedule->command('send:task --scheduled')
-                ->everyFiveMinutes()
-                ->when(function () {
-                    return TareaProgramada::where('fecha_programada', '<=', now())
-                        ->where('status', 'pendiente')
-                        ->exists();
-        })
-        ->withoutOverlapping(1500);
+            ->everyFiveMinutes()
+            ->when(function () {
+                return TareaProgramada::where('fecha_programada', '<=', now())
+                    ->where('status', 'pendiente')
+                    ->exists();
+            })
+            ->withoutOverlapping(1500);
+
+        // Ejecutar el comando cada día a las 12:00 AM
+        $schedule->command('statistics:update-summary')->dailyAt('00:00');
     }
 
     /**
@@ -33,7 +36,7 @@ class Kernel extends ConsoleKernel
      */
     protected function commands()
     {
-        $this->load(__DIR__.'/Commands');
+        $this->load(__DIR__ . '/Commands');
 
         require base_path('routes/console.php');
     }
