@@ -51,9 +51,16 @@ class SendTask extends Command
         $this->info('Ejecutando tarea programada...');
 
         if ($this->option('scheduled')) {
+            $inicio = now()->startOfMinute();
+            $fin = now()->endOfMinute();
+
+            Log::info("Buscando tareas entre: $inicio y $fin");
+
             $tareasPendientes = TareaProgramada::where('status', 'pendiente')
-                ->whereBetween('fecha_programada', [now()->startOfMinute(), now()->endOfMinute()])
+                ->whereBetween('fecha_programada', [$inicio, $fin])
                 ->get();
+
+            Log::info('Tareas programadas encontradas: ' . count($tareasPendientes));
 
 
             Log::info('Tareas programadas encontradas: ' . count($tareasPendientes));
@@ -101,7 +108,7 @@ class SendTask extends Command
                 }
 
                 if ($mensajesEnviados > 0) {
-                    $tarea->status = 'enviada';
+                    $tarea->status = 'enviadatt';
                     $tarea->save();
                 } else {
                     Log::info("No se enviaron mensajes para la tarea {$tarea->id}, el estado no cambiará.");
