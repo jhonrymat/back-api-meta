@@ -52,13 +52,15 @@ class SendTask extends Command
 
         // 1️⃣ Verificar la fecha del sistema
         Log::info('🕒 Fecha actual del servidor: ' . now()->toDateTimeString());
+        Log::info('🕒 Fecha actual del servidor: ' . now());
+        Log::info('🔍 Buscando tareas con fecha menor o igual a: ' . now()->addMinute());
 
         // 2️⃣ Verificar cuántas tareas existen en la base de datos
         $todasLasTareas = TareaProgramada::all();
         Log::info('📋 Total de tareas en la base de datos: ' . count($todasLasTareas));
 
         // 3️⃣ Filtrar solo las tareas pendientes que deben ejecutarse
-        $tareasPendientes = TareaProgramada::whereRaw("fecha_programada <= ?", [now()])
+        $tareasPendientes = TareaProgramada::whereRaw("fecha_programada <= ?", [now()->addMinute()])
             ->where('status', 'pendiente')
             ->get();
 
