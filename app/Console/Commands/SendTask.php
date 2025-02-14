@@ -52,8 +52,9 @@ class SendTask extends Command
 
         if ($this->option('scheduled')) {
             $tareasPendientes = TareaProgramada::where('status', 'pendiente')
-                ->whereBetween('fecha_programada', [now()->subMinute(), now()->addMinute()])
+                ->whereBetween('fecha_programada', [now()->startOfMinute(), now()->endOfMinute()])
                 ->get();
+
 
             Log::info('Tareas programadas encontradas: ' . count($tareasPendientes));
 
