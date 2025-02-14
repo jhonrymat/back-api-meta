@@ -55,13 +55,13 @@ class SendTask extends Command
                 ->whereBetween('fecha_programada', [now()->subMinute(), now()->addMinute()])
                 ->get();
 
-
             Log::info('Tareas programadas encontradas: ' . count($tareasPendientes));
 
             foreach ($tareasPendientes as $tarea) {
                 $nombreArchivo = basename($tarea->numeros);
                 $rutaArchivo = storage_path("app/tareas/$nombreArchivo");
                 $payload = json_decode($tarea->payload, true);
+                $mensajesEnviados = 0;
 
                 try {
                     $rutaArchivo = realpath($rutaArchivo);
@@ -77,7 +77,10 @@ class SendTask extends Command
                                 if ($contacto) {
                                     $personalizedBody = $this->reemplazarPlaceholders($tarea->body, $contacto);
                                     $payload['to'] = $linea;
-                                    SendMessage::dispatch($tarea->token_app, $tarea->phone_id, $payload, $personalizedBody, $tarea->messageData, $tarea->distintivo)->onQueue('whatsapp-queue');
+                                    SendMessage::dispatch($tarea->token_app, $tarea->phone_id, $payload, $personalizedBody, $tarea->messageData, $tarea->distintivo)
+                                        ->onQueue('whatsapp-queue');
+
+                                    $mensajesEnviados++;
                                 } else {
                                     Log::warning("Contacto no encontrado para el número: $linea");
                                 }
@@ -86,7 +89,9 @@ class SendTask extends Command
                             }
                         }
 
-                        $this->registrarEnvio($payload['template']['name'], count($lineas), $tarea->body, $tarea->tag);
+                        if ($mensajesEnviados > 0) {
+                            $this->registrarEnvio($payload['template']['name'], $mensajesEnviados, $tarea->body, $tarea->tag);
+                        }
                     } else {
                         Log::error("El archivo no existe en la ruta: $rutaArchivo");
                     }
@@ -94,8 +99,12 @@ class SendTask extends Command
                     Log::error("Error al procesar la tarea programada: " . $e->getMessage());
                 }
 
-                $tarea->status = 'enviada';
-                $tarea->save();
+                if ($mensajesEnviados > 0) {
+                    $tarea->status = 'enviada';
+                    $tarea->save();
+                } else {
+                    Log::info("No se enviaron mensajes para la tarea {$tarea->id}, el estado no cambiará.");
+                }
             }
         } else {
             $this->info('El comando debe ejecutarse solo cuando hay tareas programadas.');
@@ -103,6 +112,7 @@ class SendTask extends Command
 
         $this->info('Tarea programada completada.');
     }
+
 
 
 
