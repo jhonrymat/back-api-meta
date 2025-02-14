@@ -48,85 +48,59 @@ class SendTask extends Command
      */
     public function handle()
     {
-        Log::info('🔹 Iniciando send:task --scheduled');
+        $this->info('Ejecutando tarea programada...');
 
-        // 1️⃣ Verificar la fecha del sistema
-        Log::info('🕒 Fecha actual del servidor: ' . now()->toDateTimeString());
-        Log::info('🕒 Fecha actual del servidor: ' . now());
-        Log::info('🔍 Buscando tareas con fecha menor o igual a: ' . now()->addMinute());
+        if ($this->option('scheduled')) {
+            $tareasPendientes = TareaProgramada::where('fecha_programada', '<=', now())
+                ->where('status', 'pendiente')
+                ->get();
 
-        // 2️⃣ Verificar cuántas tareas existen en la base de datos
-        $todasLasTareas = TareaProgramada::all();
-        Log::info('📋 Total de tareas en la base de datos: ' . count($todasLasTareas));
+            Log::info('Tareas programadas encontradas: ' . $tareasPendientes->count());
 
-        // 3️⃣ Filtrar solo las tareas pendientes que deben ejecutarse
-        $tareasPendientes = TareaProgramada::whereRaw("fecha_programada <= ?", [now()->subSeconds(30)])
-            ->where('status', 'pendiente')
-            ->get();
-
-
-        Log::info('📌 Tareas encontradas para ejecutar: ' . count($tareasPendientes));
-
-        foreach ($tareasPendientes as $tarea) {
-            Log::info("📢 Procesando tarea ID: {$tarea->id}, programada para: {$tarea->fecha_programada}");
-
-            try {
+            foreach ($tareasPendientes as $tarea) {
                 $nombreArchivo = basename($tarea->numeros);
                 $rutaArchivo = storage_path("app/tareas/$nombreArchivo");
-
-                if (!file_exists($rutaArchivo)) {
-                    Log::error("❌ ERROR: Archivo no encontrado en la ruta: $rutaArchivo");
-                    continue; // No procesamos esta tarea si el archivo no existe
-                }
-
-                $lineas = file($rutaArchivo, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-                Log::info("📄 Archivo cargado correctamente, contiene " . count($lineas) . " números.");
-
                 $payload = json_decode($tarea->payload, true);
 
-                $mensajesEnviados = 0;
-                foreach ($lineas as $linea) {
-                    $userId = $this->obtenerUserIdDesdePhoneId($tarea->phone_id);
+                try {
+                    $rutaArchivo = realpath($rutaArchivo);
 
-                    if (!$userId) {
-                        Log::error("❌ ERROR: No se encontró un user_id para phone_id: {$tarea->phone_id}");
-                        continue;
+                    if ($rutaArchivo !== false && file_exists($rutaArchivo)) {
+                        $lineas = file($rutaArchivo, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+
+                        foreach ($lineas as $linea) {
+                            $userId = $this->obtenerUserIdDesdePhoneId($tarea->phone_id);
+                            if ($userId) {
+                                $contacto = $this->obtenerContacto($linea, $userId);
+
+                                if ($contacto) {
+                                    $personalizedBody = $this->reemplazarPlaceholders($tarea->body, $contacto);
+                                    $payload['to'] = $linea;
+                                    SendMessage::dispatch($tarea->token_app, $tarea->phone_id, $payload, $personalizedBody, $tarea->messageData, $tarea->distintivo)->onQueue('whatsapp-queue');
+                                } else {
+                                    Log::warning("Contacto no encontrado para el número: $linea");
+                                }
+                            } else {
+                                Log::error("No se encontró un user_id para el phone_id: {$tarea->phone_id}");
+                            }
+                        }
+
+                        $this->registrarEnvio($payload['template']['name'], count($lineas), $tarea->body, $tarea->tag);
+                    } else {
+                        Log::error("El archivo no existe en la ruta: $rutaArchivo");
                     }
-
-                    $contacto = $this->obtenerContacto($linea, $userId);
-
-                    if (!$contacto) {
-                        Log::warning("⚠️ Advertencia: Contacto no encontrado para el número: $linea");
-                        continue;
-                    }
-
-                    // Personalizar el mensaje
-                    $personalizedBody = $this->reemplazarPlaceholders($tarea->body, $contacto);
-                    $payload['to'] = $linea;
-
-                    // Enviar mensaje a la cola
-                    SendMessage::dispatch($tarea->token_app, $tarea->phone_id, $payload, $personalizedBody, $tarea->messageData, $tarea->distintivo)->onQueue('whatsapp-queue');
-                    Log::info("🚀 Mensaje enviado a la cola para: $linea");
-
-                    $mensajesEnviados++;
+                } catch (\Exception $e) {
+                    Log::error("Error al procesar la tarea programada: " . $e->getMessage());
                 }
 
-                // Si se enviaron mensajes, actualizamos el estado
-                if ($mensajesEnviados > 0) {
-                    $tarea->status = 'enviada';
-                    $tarea->save();
-                    Log::info("✅ Tarea ID: {$tarea->id} marcada como 'enviada' en la base de datos.");
-                } else {
-                    Log::warning("⚠️ No se enviaron mensajes para la tarea ID: {$tarea->id}, su estado no cambiará.");
-                }
-
-            } catch (\Exception $e) {
-                Log::error("❌ ERROR al procesar la tarea ID: {$tarea->id} - " . $e->getMessage());
+                $tarea->status = 'enviada';
+                $tarea->save();
             }
+        } else {
+            $this->info('El comando debe ejecutarse solo cuando hay tareas programadas.');
         }
 
-
-        Log::info('✅ Finalizando send:task --scheduled');
+        $this->info('Tarea programada completada.');
     }
 
 
