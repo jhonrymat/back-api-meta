@@ -50,12 +50,15 @@ class SendTask extends Command
     {
         Log::info('🔹 Iniciando send:task --scheduled');
 
-        // 1️⃣ Verificar cuántas tareas existen en la base de datos
+        // 1️⃣ Verificar la fecha del sistema
+        Log::info('🕒 Fecha actual del servidor: ' . now()->toDateTimeString());
+
+        // 2️⃣ Verificar cuántas tareas existen en la base de datos
         $todasLasTareas = TareaProgramada::all();
         Log::info('📋 Total de tareas en la base de datos: ' . count($todasLasTareas));
 
-        // 2️⃣ Filtrar solo las tareas pendientes que deben ejecutarse
-        $tareasPendientes = TareaProgramada::where('fecha_programada', '<=', now())
+        // 3️⃣ Filtrar solo las tareas pendientes que deben ejecutarse
+        $tareasPendientes = TareaProgramada::whereRaw("fecha_programada <= ?", [now()])
             ->where('status', 'pendiente')
             ->get();
 
@@ -65,7 +68,7 @@ class SendTask extends Command
             Log::info("📢 Procesando tarea ID: {$tarea->id}, programada para: {$tarea->fecha_programada}");
 
             try {
-                // 3️⃣ Obtener el archivo asociado a la tarea
+                // 4️⃣ Obtener el archivo asociado a la tarea
                 $nombreArchivo = basename($tarea->numeros);
                 $rutaArchivo = storage_path("app/tareas/$nombreArchivo");
 
@@ -74,11 +77,11 @@ class SendTask extends Command
                     continue;
                 }
 
-                // 4️⃣ Leer el archivo y obtener los números de teléfono
+                // 5️⃣ Leer el archivo y obtener los números de teléfono
                 $lineas = file($rutaArchivo, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
                 Log::info("📄 Archivo cargado correctamente, contiene " . count($lineas) . " números.");
 
-                // 5️⃣ Decodificar el payload del mensaje
+                // 6️⃣ Decodificar el payload del mensaje
                 $payload = json_decode($tarea->payload, true);
 
                 foreach ($lineas as $linea) {
@@ -96,20 +99,21 @@ class SendTask extends Command
                         continue;
                     }
 
-                    // 6️⃣ Personalizar el cuerpo del mensaje con los datos del contacto
+                    // 7️⃣ Personalizar el cuerpo del mensaje con los datos del contacto
                     $personalizedBody = $this->reemplazarPlaceholders($tarea->body, $contacto);
                     $payload['to'] = $linea;
 
-                    // 7️⃣ Enviar mensaje a la cola
-                    SendMessage::dispatch($tarea->token_app, $tarea->phone_id, $payload, $personalizedBody, $tarea->messageData, $tarea->distintivo)->onQueue('whatsapp-queue');
-                    Log::info("🚀 Mensaje enviado a la cola para: $linea");
+                    // 8️⃣ Enviar mensaje a la cola correcta
+                    SendMessage::dispatch($tarea->token_app, $tarea->phone_id, $payload, $personalizedBody, $tarea->messageData, $tarea->distintivo)
+                        ->onQueue('whatsapp-queue'); // 🔹 Asegura que se envía a la cola correcta
+                    Log::info("🚀 Mensaje enviado a la cola 'whatsapp-queue' para: $linea");
                 }
 
-                // 8️⃣ Registrar el envío en la base de datos
+                // 9️⃣ Registrar el envío en la base de datos
                 $this->registrarEnvio($payload['template']['name'], count($lineas), $tarea->body, $tarea->tag);
                 Log::info("✅ Registro de envío guardado en la base de datos.");
 
-                // 9️⃣ Actualizar estado de la tarea a "enviada"
+                // 🔟 Actualizar estado de la tarea a "enviada"
                 $tarea->status = 'enviada';
                 $tarea->save();
                 Log::info("✅ Tarea ID: {$tarea->id} marcada como 'enviada' en la base de datos.");
@@ -121,6 +125,7 @@ class SendTask extends Command
 
         Log::info('✅ Finalizando send:task --scheduled');
     }
+
 
 
 
