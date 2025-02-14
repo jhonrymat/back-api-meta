@@ -48,6 +48,8 @@ class SendTask extends Command
      */
     public function handle()
     {
+        Log::info('Ejecutando send:task --scheduled');
+
         $this->info('Ejecutando tarea programada...');
 
         if ($this->option('scheduled')) {
