@@ -60,9 +60,10 @@ class SendTask extends Command
         Log::info('📋 Total de tareas en la base de datos: ' . count($todasLasTareas));
 
         // 3️⃣ Filtrar solo las tareas pendientes que deben ejecutarse
-        $tareasPendientes = TareaProgramada::whereRaw("fecha_programada <= ?", [now()->addMinute()])
+        $tareasPendientes = TareaProgramada::whereRaw("fecha_programada <= ?", [now()->subSeconds(30)])
             ->where('status', 'pendiente')
             ->get();
+
 
         Log::info('📌 Tareas encontradas para ejecutar: ' . count($tareasPendientes));
 
@@ -70,22 +71,20 @@ class SendTask extends Command
             Log::info("📢 Procesando tarea ID: {$tarea->id}, programada para: {$tarea->fecha_programada}");
 
             try {
-                // 4️⃣ Obtener el archivo asociado a la tarea
                 $nombreArchivo = basename($tarea->numeros);
                 $rutaArchivo = storage_path("app/tareas/$nombreArchivo");
 
                 if (!file_exists($rutaArchivo)) {
                     Log::error("❌ ERROR: Archivo no encontrado en la ruta: $rutaArchivo");
-                    continue;
+                    continue; // No procesamos esta tarea si el archivo no existe
                 }
 
-                // 5️⃣ Leer el archivo y obtener los números de teléfono
                 $lineas = file($rutaArchivo, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
                 Log::info("📄 Archivo cargado correctamente, contiene " . count($lineas) . " números.");
 
-                // 6️⃣ Decodificar el payload del mensaje
                 $payload = json_decode($tarea->payload, true);
 
+                $mensajesEnviados = 0;
                 foreach ($lineas as $linea) {
                     $userId = $this->obtenerUserIdDesdePhoneId($tarea->phone_id);
 
@@ -101,29 +100,31 @@ class SendTask extends Command
                         continue;
                     }
 
-                    // 7️⃣ Personalizar el cuerpo del mensaje con los datos del contacto
+                    // Personalizar el mensaje
                     $personalizedBody = $this->reemplazarPlaceholders($tarea->body, $contacto);
                     $payload['to'] = $linea;
 
-                    // 8️⃣ Enviar mensaje a la cola correcta
-                    SendMessage::dispatch($tarea->token_app, $tarea->phone_id, $payload, $personalizedBody, $tarea->messageData, $tarea->distintivo)
-                        ->onQueue('whatsapp-queue'); // 🔹 Asegura que se envía a la cola correcta
-                    Log::info("🚀 Mensaje enviado a la cola 'whatsapp-queue' para: $linea");
+                    // Enviar mensaje a la cola
+                    SendMessage::dispatch($tarea->token_app, $tarea->phone_id, $payload, $personalizedBody, $tarea->messageData, $tarea->distintivo)->onQueue('whatsapp-queue');
+                    Log::info("🚀 Mensaje enviado a la cola para: $linea");
+
+                    $mensajesEnviados++;
                 }
 
-                // 9️⃣ Registrar el envío en la base de datos
-                $this->registrarEnvio($payload['template']['name'], count($lineas), $tarea->body, $tarea->tag);
-                Log::info("✅ Registro de envío guardado en la base de datos.");
-
-                // 🔟 Actualizar estado de la tarea a "enviada"
-                $tarea->status = 'enviada';
-                $tarea->save();
-                Log::info("✅ Tarea ID: {$tarea->id} marcada como 'enviada' en la base de datos.");
+                // Si se enviaron mensajes, actualizamos el estado
+                if ($mensajesEnviados > 0) {
+                    $tarea->status = 'enviada';
+                    $tarea->save();
+                    Log::info("✅ Tarea ID: {$tarea->id} marcada como 'enviada' en la base de datos.");
+                } else {
+                    Log::warning("⚠️ No se enviaron mensajes para la tarea ID: {$tarea->id}, su estado no cambiará.");
+                }
 
             } catch (\Exception $e) {
                 Log::error("❌ ERROR al procesar la tarea ID: {$tarea->id} - " . $e->getMessage());
             }
         }
+
 
         Log::info('✅ Finalizando send:task --scheduled');
     }
