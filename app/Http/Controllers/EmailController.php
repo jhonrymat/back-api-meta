@@ -20,7 +20,7 @@ class EmailController extends Controller
         try {
             // Despachar el trabajo a la cola
             SendEmailJob::dispatch($email, $subject, $messageBody)
-                ->onQueue(env('DATABASE_EMAIL_QUEUE', 'database-email-queue'));
+                ->onQueue('email-queue');
             return redirect()->back()->with('success', 'Correo enviado a la cola correctamente.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Error al enviar el correo: ' . $e->getMessage());
@@ -38,7 +38,7 @@ class EmailController extends Controller
 
         foreach ($group->userEmails as $userEmail) {
             SendEmailJob::dispatch($userEmail->email, $validated['subject'], $validated['messageBody'])
-                ->onQueue(env('DATABASE_EMAIL_QUEUE', 'database-email-queue'));
+                ->onQueue('email-queue');
         }
 
         return redirect()->back()->with('success', 'Correos enviados al grupo correctamente.');

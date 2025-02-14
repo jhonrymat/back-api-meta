@@ -99,7 +99,7 @@ class EstadisticasController extends Controller
         try {
 
             $report = Reporte::findOrFail($id);
-            ExportMessages::dispatch($report->fechaInicio, $report->fechaFin, $id, $report->id_telefono);
+            ExportMessages::dispatch($report->fechaInicio, $report->fechaFin, $id, $report->id_telefono)->onQueue('email-queue');
 
             return response()->json(['status' => 'Exportación iniciada']);
         } catch (ModelNotFoundException $e) {

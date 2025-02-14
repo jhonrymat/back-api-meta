@@ -48,81 +48,80 @@ class SendTask extends Command
      */
     public function handle()
     {
-        Log::info('🔹 Ejecutando send:task --scheduled');
+        Log::info('🔹 Iniciando send:task --scheduled');
 
-        $this->info('Ejecutando tarea programada...');
+        // 1️⃣ Verificar cuántas tareas existen en la base de datos
+        $todasLasTareas = TareaProgramada::all();
+        Log::info('📋 Total de tareas en la base de datos: ' . count($todasLasTareas));
 
-        if ($this->option('scheduled')) {
-            $tareasPendientes = TareaProgramada::where('fecha_programada', '<=', now())
-                ->where('status', 'pendiente')
-                ->get();
+        // 2️⃣ Filtrar solo las tareas pendientes que deben ejecutarse
+        $tareasPendientes = TareaProgramada::where('fecha_programada', '<=', now())
+            ->where('status', 'pendiente')
+            ->get();
 
-            Log::info('📌 Tareas encontradas: ' . count($tareasPendientes));
+        Log::info('📌 Tareas encontradas para ejecutar: ' . count($tareasPendientes));
 
-            foreach ($tareasPendientes as $tarea) {
-                Log::info("📢 Procesando tarea ID: {$tarea->id}");
+        foreach ($tareasPendientes as $tarea) {
+            Log::info("📢 Procesando tarea ID: {$tarea->id}, programada para: {$tarea->fecha_programada}");
 
+            try {
+                // 3️⃣ Obtener el archivo asociado a la tarea
                 $nombreArchivo = basename($tarea->numeros);
                 $rutaArchivo = storage_path("app/tareas/$nombreArchivo");
-                $payload = json_decode($tarea->payload, true);
 
-                try {
-                    $rutaArchivo = realpath($rutaArchivo);
-                    Log::info("📂 Ruta archivo contactos: " . ($rutaArchivo ?: 'No encontrada'));
-
-                    if ($rutaArchivo !== false && file_exists($rutaArchivo)) {
-                        $lineas = file($rutaArchivo, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-                        Log::info("📄 Archivo contiene " . count($lineas) . " líneas");
-
-                        foreach ($lineas as $linea) {
-                            $userId = $this->obtenerUserIdDesdePhoneId($tarea->phone_id);
-                            Log::info("📞 Número: $linea, User ID: " . ($userId ?: 'No encontrado'));
-
-                            if ($userId) {
-                                $contacto = $this->obtenerContacto($linea, $userId);
-
-                                if ($contacto) {
-                                    Log::info("✅ Contacto encontrado: {$contacto->id}");
-
-                                    $personalizedBody = $this->reemplazarPlaceholders($tarea->body, $contacto);
-                                    $payload['to'] = $linea;
-
-                                    SendMessage::dispatch(
-                                        $tarea->token_app,
-                                        $tarea->phone_id,
-                                        $payload,
-                                        $personalizedBody,
-                                        $tarea->messageData,
-                                        $tarea->distintivo
-                                    );
-
-                                    Log::info("📤 Mensaje encolado para el número: $linea");
-                                } else {
-                                    Log::warning("⚠️ Contacto no encontrado para el número: $linea");
-                                }
-                            } else {
-                                Log::error("❌ No se encontró un user_id para el phone_id: {$tarea->phone_id}");
-                            }
-                        }
-
-                        $this->registrarEnvio($payload['template']['name'], count($lineas), $tarea->body, $tarea->tag);
-                    } else {
-                        Log::error("❌ El archivo no existe en la ruta: $rutaArchivo");
-                    }
-                } catch (\Exception $e) {
-                    Log::error("❌ Error al procesar la tarea ID {$tarea->id}: " . $e->getMessage());
+                if (!file_exists($rutaArchivo)) {
+                    Log::error("❌ ERROR: Archivo no encontrado en la ruta: $rutaArchivo");
+                    continue;
                 }
 
-                Log::info("🟢 Cambiando estado a 'enviada' para la tarea ID {$tarea->id}");
+                // 4️⃣ Leer el archivo y obtener los números de teléfono
+                $lineas = file($rutaArchivo, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                Log::info("📄 Archivo cargado correctamente, contiene " . count($lineas) . " números.");
+
+                // 5️⃣ Decodificar el payload del mensaje
+                $payload = json_decode($tarea->payload, true);
+
+                foreach ($lineas as $linea) {
+                    $userId = $this->obtenerUserIdDesdePhoneId($tarea->phone_id);
+
+                    if (!$userId) {
+                        Log::error("❌ ERROR: No se encontró un user_id para phone_id: {$tarea->phone_id}");
+                        continue;
+                    }
+
+                    $contacto = $this->obtenerContacto($linea, $userId);
+
+                    if (!$contacto) {
+                        Log::warning("⚠️ Advertencia: Contacto no encontrado para el número: $linea");
+                        continue;
+                    }
+
+                    // 6️⃣ Personalizar el cuerpo del mensaje con los datos del contacto
+                    $personalizedBody = $this->reemplazarPlaceholders($tarea->body, $contacto);
+                    $payload['to'] = $linea;
+
+                    // 7️⃣ Enviar mensaje a la cola
+                    SendMessage::dispatch($tarea->token_app, $tarea->phone_id, $payload, $personalizedBody, $tarea->messageData, $tarea->distintivo)->onQueue('whatsapp-queue');
+                    Log::info("🚀 Mensaje enviado a la cola para: $linea");
+                }
+
+                // 8️⃣ Registrar el envío en la base de datos
+                $this->registrarEnvio($payload['template']['name'], count($lineas), $tarea->body, $tarea->tag);
+                Log::info("✅ Registro de envío guardado en la base de datos.");
+
+                // 9️⃣ Actualizar estado de la tarea a "enviada"
                 $tarea->status = 'enviada';
                 $tarea->save();
+                Log::info("✅ Tarea ID: {$tarea->id} marcada como 'enviada' en la base de datos.");
+
+            } catch (\Exception $e) {
+                Log::error("❌ ERROR al procesar la tarea ID: {$tarea->id} - " . $e->getMessage());
             }
-        } else {
-            $this->info('El comando debe ejecutarse solo cuando hay tareas programadas.');
         }
 
-        $this->info('Tarea programada completada.');
+        Log::info('✅ Finalizando send:task --scheduled');
     }
+
 
 
     /**
