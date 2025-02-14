@@ -48,7 +48,7 @@ class SendTask extends Command
      */
     public function handle()
     {
-        Log::info('Ejecutando send:task --scheduled');
+        Log::info('🔹 Ejecutando send:task --scheduled');
 
         $this->info('Ejecutando tarea programada...');
 
@@ -57,42 +57,63 @@ class SendTask extends Command
                 ->where('status', 'pendiente')
                 ->get();
 
+            Log::info('📌 Tareas encontradas: ' . count($tareasPendientes));
+
             foreach ($tareasPendientes as $tarea) {
+                Log::info("📢 Procesando tarea ID: {$tarea->id}");
+
                 $nombreArchivo = basename($tarea->numeros);
                 $rutaArchivo = storage_path("app/tareas/$nombreArchivo");
                 $payload = json_decode($tarea->payload, true);
 
                 try {
                     $rutaArchivo = realpath($rutaArchivo);
+                    Log::info("📂 Ruta archivo contactos: " . ($rutaArchivo ?: 'No encontrada'));
 
                     if ($rutaArchivo !== false && file_exists($rutaArchivo)) {
                         $lineas = file($rutaArchivo, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                        Log::info("📄 Archivo contiene " . count($lineas) . " líneas");
 
                         foreach ($lineas as $linea) {
                             $userId = $this->obtenerUserIdDesdePhoneId($tarea->phone_id);
+                            Log::info("📞 Número: $linea, User ID: " . ($userId ?: 'No encontrado'));
+
                             if ($userId) {
                                 $contacto = $this->obtenerContacto($linea, $userId);
 
                                 if ($contacto) {
+                                    Log::info("✅ Contacto encontrado: {$contacto->id}");
+
                                     $personalizedBody = $this->reemplazarPlaceholders($tarea->body, $contacto);
                                     $payload['to'] = $linea;
-                                    SendMessage::dispatch($tarea->token_app, $tarea->phone_id, $payload, $personalizedBody, $tarea->messageData, $tarea->distintivo);
+
+                                    SendMessage::dispatch(
+                                        $tarea->token_app,
+                                        $tarea->phone_id,
+                                        $payload,
+                                        $personalizedBody,
+                                        $tarea->messageData,
+                                        $tarea->distintivo
+                                    );
+
+                                    Log::info("📤 Mensaje encolado para el número: $linea");
                                 } else {
-                                    Log::warning("Contacto no encontrado para el número: $linea");
+                                    Log::warning("⚠️ Contacto no encontrado para el número: $linea");
                                 }
                             } else {
-                                Log::error("No se encontró un user_id para el phone_id: {$tarea->phone_id}");
+                                Log::error("❌ No se encontró un user_id para el phone_id: {$tarea->phone_id}");
                             }
                         }
 
                         $this->registrarEnvio($payload['template']['name'], count($lineas), $tarea->body, $tarea->tag);
                     } else {
-                        Log::error("El archivo no existe en la ruta: $rutaArchivo");
+                        Log::error("❌ El archivo no existe en la ruta: $rutaArchivo");
                     }
                 } catch (\Exception $e) {
-                    Log::error("Error al procesar la tarea programada: " . $e->getMessage());
+                    Log::error("❌ Error al procesar la tarea ID {$tarea->id}: " . $e->getMessage());
                 }
 
+                Log::info("🟢 Cambiando estado a 'enviada' para la tarea ID {$tarea->id}");
                 $tarea->status = 'enviada';
                 $tarea->save();
             }
@@ -102,6 +123,7 @@ class SendTask extends Command
 
         $this->info('Tarea programada completada.');
     }
+
 
     /**
      * Obtener el user_id desde el phone_id.
