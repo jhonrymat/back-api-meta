@@ -51,11 +51,12 @@ class SendTask extends Command
         $this->info('Ejecutando tarea programada...');
 
         if ($this->option('scheduled')) {
-            $tareasPendientes = TareaProgramada::where('fecha_programada', '<=', now())
-                ->where('status', 'pendiente')
+            $tareasPendientes = TareaProgramada::where('status', 'pendiente')
+                ->whereBetween('fecha_programada', [now()->subMinute(), now()->addMinute()])
                 ->get();
 
-            Log::info('Tareas programadas encontradas: ' . $tareasPendientes->count());
+
+            Log::info('Tareas programadas encontradas: ' . count($tareasPendientes));
 
             foreach ($tareasPendientes as $tarea) {
                 $nombreArchivo = basename($tarea->numeros);
