@@ -315,14 +315,14 @@ return [
             'icon' => 'fas fa-fw fa-user',
             'submenu' => [
                 [
-                    'text' => 'Contactos',
+                    'text' => 'Consultar',
                     'route' => 'contact.index',
                     'can' => 'contactos.index',
                     'icon' => 'fas fa-fw fa-users',
                     'target' => '_blank', // Esta clave abre el enlace en una nueva pestaña
                 ],
                 [
-                    'text' => 'New - export - import',
+                    'text' => 'Gestionar',
                     'route' => 'contactos.index',
                     'can' => 'contactos.index',
                     'icon' => 'fas fa-fw fa-address-book',
@@ -395,7 +395,7 @@ return [
                             'icon' => 'fas fa-fw fa-chart-line',
                         ],
                         [
-                            'text' => 'Envios plantilla',
+                            'text' => 'Historial de envió',
                             'route' => 'envios-plantillas',
                             'can' => 'envios-plantillas',
                             'icon' => 'fas fa-fw fa-chart-line',
@@ -403,11 +403,11 @@ return [
                     ],
                 ],
                 [
-                    'text' => 'Bots',
+                    'text' => 'Agentes IA',
                     'icon' => 'fas fa-fw fa-robot',
                     'submenu' => [
                         [
-                            'text' => 'Bots',
+                            'text' => 'Gestinar IA',
                             'route' => 'bots.index',
                             'icon' => 'fas fa-fw fa-robot',
                         ],

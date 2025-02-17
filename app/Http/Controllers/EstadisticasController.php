@@ -70,21 +70,27 @@ class EstadisticasController extends Controller
             };
 
             // Usar la función para calcular los porcentajes
-            $sentPercentage = $getPercentage($statusCounts->get('sent', collect(['count' => 0]))['count']);
+            $sent = $getPercentage($statusCounts->get('sent', collect(['count' => 0]))['count']);
             $deliveredPercentage = $getPercentage($statusCounts->get('delivered', collect(['count' => 0]))['count']);
-            $readPercentage = $getPercentage($statusCounts->get('read', collect(['count' => 0]))['count']);
+            $read = $getPercentage($statusCounts->get('read', collect(['count' => 0]))['count']);
             $failedPercentage = $getPercentage($statusCounts->get('failed', collect(['count' => 0]))['count']);
+            // suma de sent y read
+            $sentPercentage = $sent + $read;
+
+            $sentCount = $statusCounts->get('sent', collect(['count' => 0]))['count'];
+            $readCount = $statusCounts->get('read', collect(['count' => 0]))['count'];
+            // suma de sentCount y readCount
+            $sentCount = $sentCount + $readCount;
+
 
             return response()->json([
                 'totalMessages' => $totalMessages,
                 'sentPercentage' => $sentPercentage,
                 'deliveredPercentage' => $deliveredPercentage,
-                'readPercentage' => $readPercentage,
                 'failedPercentage' => $failedPercentage,
-                'sentCount' => $statusCounts->get('sent', collect(['count' => 0]))['count'],
                 'deliveredCount' => $statusCounts->get('delivered', collect(['count' => 0]))['count'],
-                'readCount' => $statusCounts->get('read', collect(['count' => 0]))['count'],
                 'failedCount' => $statusCounts->get('failed', collect(['count' => 0]))['count'],
+                'sentCount' => $sentCount,
                 'startDate' => $startDate,
                 'endDate' => $endDate,
                 'reportes' => $reportes,

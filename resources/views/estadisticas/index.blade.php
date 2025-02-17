@@ -88,16 +88,6 @@
                                         <td><span id="deliveredPercentage" class="badge bg-secondary"></span></td>
                                     </tr>
                                     <tr>
-                                        <td>Leidos</td>
-                                        <td id="readCount">0</td>
-                                        <td>
-                                            <div class="progress progress-xs">
-                                                <div id="readProgressBar" class="progress-bar bg-warning"></div>
-                                            </div>
-                                        </td>
-                                        <td><span id="readPercentage" class="badge bg-warning"></span></td>
-                                    </tr>
-                                    <tr>
                                         <td>Fallidos</td>
                                         <td id="failedCount">0</td>
                                         <td>
@@ -311,7 +301,6 @@
                         // Asignar los valores recibidos a las variables de la vista
                         $('#sentCount').text(response.sentCount);
                         $('#deliveredCount').text(response.deliveredCount);
-                        $('#readCount').text(response.readCount);
                         $('#failedCount').text(response.failedCount);
                         $('#totalMessages').text(response.totalMessages);
                         $('#totalEventos').text(response.totalMessages);
@@ -323,13 +312,11 @@
 
                         $('#sentPercentage').text(response.sentPercentage + "%");
                         $('#deliveredPercentage').text(response.deliveredPercentage + "%");
-                        $('#readPercentage').text(response.readPercentage + "%");
                         $('#failedPercentage').text(response.failedPercentage + "%");
 
                         $('#sentProgressBar').css('width', response.sentPercentage + "%");
                         $('#deliveredProgressBar').css('width', response.deliveredPercentage +
                             "%");
-                        $('#readProgressBar').css('width', response.readPercentage + "%");
                         $('#failedProgressBar').css('width', response.failedPercentage + "%");
 
                         var donutChartCanvas = $('#donutChart').get(0).getContext('2d');
@@ -337,15 +324,11 @@
                             labels: [
                                 'Enviados',
                                 'Entregados',
-                                'Leídos',
                                 'Fallidos',
                             ],
                             datasets: [{
-                                data: [response.sentCount, response.deliveredCount,
-                                    response.readCount, response.failedCount
-                                ],
-                                backgroundColor: ['#00c0ef', '#f39c12', '#008b46',
-                                    '#f50854'
+                                data: [response.sentCount, response.deliveredCount, response.failedCount ],
+                                backgroundColor: ['#00c0ef', '#f39c12', '#f50854'
                                 ],
                             }]
                         };

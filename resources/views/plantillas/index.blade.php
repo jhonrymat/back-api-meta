@@ -70,6 +70,20 @@
                     <textarea class="form-control" id="exampleFormControlTextarea1" rows="3" required></textarea>
                 </div>
 
+                <div class="mt-3">
+                    <label class="form-label">¿Desea quitar los números repetidos?</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="eliminarDuplicados" id="eliminarSi"
+                            value="si">
+                        <label class="form-check-label" for="eliminarSi">Sí</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="eliminarDuplicados" id="eliminarNo"
+                            value="no" checked>
+                        <label class="form-check-label" for="eliminarNo">No</label>
+                    </div>
+                </div>
+
                 <div id="templateDetails">
                     <!-- Los detalles de la plantilla se inyectarán aquí -->
                 </div>
@@ -121,20 +135,54 @@
             return regex.test(texto);
         }
     </script>
-    <script>
-        $(document).ready(function() {
-            $('#etiqueta').change(function() {
+      <script>
+        $(document).ready(function () {
+            $('#etiqueta').change(function () {
+                updateContactList();
+            });
+
+            $('input[name="eliminarDuplicados"]').change(function () {
                 updateContactList();
             });
 
             function updateContactList() {
                 var selectedTag = $('#etiqueta option:selected');
-                var numeros = selectedTag.map(function() {
+                var numeros = selectedTag.map(function () {
                     return $(this).data('numeros');
                 }).get().join('\n');
 
-                $('#exampleFormControlTextarea1').val(numeros);
+                var numerosArray = numeros.split('\n').filter(num => num.trim() !== ""); // Convertir a array y limpiar espacios
+                var eliminarDuplicados = $('input[name="eliminarDuplicados"]:checked').val() === 'si';
+
+                if (eliminarDuplicados) {
+                    let numerosUnicos = [];
+                    let numerosDuplicados = [];
+
+                    numerosArray.forEach(num => {
+                        if (numerosUnicos.includes(num)) {
+                            numerosDuplicados.push(num);
+                        } else {
+                            numerosUnicos.push(num);
+                        }
+                    });
+
+                    $('#exampleFormControlTextarea1').val(numerosUnicos.join('\n'));
+
+                    if (numerosDuplicados.length > 0) {
+                        Swal.fire({
+                            title: "Números Eliminados",
+                            text: "Se eliminaron los siguientes números duplicados:\n" + [...new Set(numerosDuplicados)].join('\n'),
+                            icon: "info",
+                            confirmButtonText: "Entendido"
+                        });
+                    }
+                } else {
+                    $('#exampleFormControlTextarea1').val(numeros);
+                }
             }
+
+            // Inicializar con la primera opción
+            updateContactList();
         });
     </script>
     <script>

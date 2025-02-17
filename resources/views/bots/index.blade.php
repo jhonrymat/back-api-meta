@@ -9,11 +9,11 @@
                 <a data-toggle="modal" data-target="#importBotModal" class="btn btn-primary btn-sm mb-2 mr-2"
                     title="Importar BOT">
                     <i class="fa fa-file-import"></i>
-                    Importar BOT
+                    Importar IA
                 </a>
                 <a data-toggle="modal" data-target="#createBotModal" class="btn btn-success btn-sm mb-2" title="Crear BOT">
                     <i class="fa fa-plus-circle"></i>
-                    Crear BOT
+                    Crear IA
                 </a>
             </div>
         </div>
@@ -28,7 +28,7 @@
     <table id="botsTable" class="table table-striped tabladatatable dt-responsive" style="width:100%">
         <thead>
             <tr>
-                <th>Bot</th>
+                <th>IA</th>
                 <th>Descripción</th>
                 <th>OpenAI Org</th>
                 <th>OpenAI Assistant</th>
