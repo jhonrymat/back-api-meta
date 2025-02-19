@@ -74,7 +74,7 @@ class SendTask extends Command
                                 if ($contacto) {
                                     $personalizedBody = $this->reemplazarPlaceholders($tarea->body, $contacto);
                                     $payload['to'] = $linea;
-                                    SendMessage::dispatch($tarea->token_app, $tarea->phone_id, $payload, $personalizedBody, $tarea->messageData, $tarea->distintivo);
+                                    SendMessage::dispatch($tarea->token_app, $tarea->phone_id, $payload, $personalizedBody, $tarea->messageData, $tarea->distintivo)->onQueue('whatsapp-queue');
                                 } else {
                                     Log::warning("Contacto no encontrado para el número: $linea");
                                 }

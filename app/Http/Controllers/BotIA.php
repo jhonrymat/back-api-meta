@@ -33,6 +33,7 @@ class BotIA extends Controller
     public function askBot(Request $request)
     {
         $botId = $request->input('botId');  // Obtener el botId enviado desde el frontend
+
         if ($botId) {
             // obtener el bot desde la base de datos
             $bot = Bot::find($botId);
@@ -45,6 +46,8 @@ class BotIA extends Controller
             $openai_key = $bot->openai_key;  // Usar el API Key desde el .env
             $openai_org = $bot->openai_org;  // Usar la organización desde el .env
             $openai_assistant = $bot->openai_assistant;  // Usar el assistant ID desde el .env
+
+
 
             // Llamar a la función ask para obtener la respuesta del bot
             $botResponse = $this->ask($question, $waId, $botId, $openai_key, $openai_org, $openai_assistant);
@@ -85,6 +88,24 @@ class BotIA extends Controller
 
         return 'Ha ocurrido un error al guardar tus datos';
     }
+
+    public function CreatePrompt($functionName, $parameters, $botId)
+    {
+        try {
+            $prompt = $parameters['prompt'];
+
+            return $prompt;
+
+        } catch (\Illuminate\Database\QueryException $exception) {
+            \Log::error('Error al crear el prompt: ' . $exception->getMessage());
+        }
+
+        return response()->json([
+            'type' => 'error',
+            'content' => 'Ha ocurrido un error al guardar tus datos'
+        ]);
+    }
+
 
     public function ask($question, $waId, $botId, $openai_key, $openai_org, $openai_assistant)
     {
@@ -186,6 +207,8 @@ class BotIA extends Controller
             return;
         }
 
+        $isResponsePrompt = false;
+        $dataResponse = '';
         if (isset($threadRun->status) && $threadRun->status === 'requires_action') {
             $tools_to_call = $threadRun->requiredAction->submitToolOutputs->toolCalls ?? [];
             $tools_output_array = []; // Initialize outside the loop
@@ -201,8 +224,19 @@ class BotIA extends Controller
                             ],
                         ]
                     ];
+                } else if ($tool_call->function->name === 'get_prompt_response') {
+                    $prompt = $this->CreatePrompt($tool_call->function->name, json_decode($tool_call->function->arguments, true), $botId);
+                    $isResponsePrompt = true;
+                    $dataResponse = $prompt;
+                    $tools_output_array = [
+                        'tool_outputs' => [
+                            [
+                                'tool_call_id' => $tool_call->id,  // Cambiado de 'tools_call_id' a 'tool_call_id'
+                                'output' => 'Prompt creado correctamente',
+                            ],
+                        ]
+                    ];
                 }
-
             }
             // Submit all tool outputs at once after the loop
             if (!empty($tools_output_array)) {
@@ -231,7 +265,13 @@ class BotIA extends Controller
             $threadRun->threadId,
         );
 
-        $this->answer = $messageList->data[0]->content[0]->text->value ?? 'No answer received';
+        if ($isResponsePrompt) {
+            // Si la respuesta es un prompt, guardar una cadena con el identificador
+            $this->answer = 'PROMPT:' . $dataResponse;
+        } else {
+            // Si no, guardar el mensaje normal
+            $this->answer = $messageList->data[0]->content[0]->text->value ?? 'No answer received';
+        }
     }
 
     public function askBotForEmbed(Request $request)

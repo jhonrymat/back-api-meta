@@ -13,7 +13,7 @@
                 <!-- Aquí colocamos el bloque de código con fondo oscuro y estilo de código -->
                 <div class="bg-dark text-white p-3 rounded" id="code-container-{{ $bot->id }}">
                     <code>&lt;script src="{{ config('app.url') }}/js/chat-embed.js?botId={{ $bot->id }}&botNombre={{ urlencode($bot->nombre) }}"&gt;&lt;/script&gt;</code>
-                </div>
+                </div>  
 
                 <!-- Botón para copiar el código -->
                 <button class="btn btn-primary mt-3" onclick="copyCode('code-container-{{ $bot->id }}')">Copiar código</button>

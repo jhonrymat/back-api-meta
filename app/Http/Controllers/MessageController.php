@@ -599,6 +599,13 @@ class MessageController extends Controller
             // Obtener los campos personalizados
             $customFields = CustomField::pluck('id', 'name')->toArray();
 
+            // ⚡️ **🔹 Responde inmediatamente antes de procesar los mensajes**
+            response()->json([
+                'success' => true,
+                'message' => 'Se ha creado el envió con éxito.',
+            ], 200)->send();
+            fastcgi_finish_request(); // Finaliza la respuesta HTTP al frontend
+
             if ($fechaProgramada !== null) {
                 $fechaFormateada = Carbon::parse($fechaProgramada)->toDateTimeString();
                 $numeros = $input['recipients'];

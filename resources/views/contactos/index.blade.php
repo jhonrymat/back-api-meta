@@ -70,6 +70,22 @@
             </div>
             <!-- Crear Nuevo Contacto -->
             <div class="col-12 mb-4">
+                <h4>Ahora puedes incrustar este formulario en tu web</h4>
+
+                <p>Para incrustar este formulario, copia y pega el siguiente código:</p>
+                 <!-- Botón para copiar el código -->
+                 <button class="btn btn-primary mt-3" onclick="copyCode('code-container-{{ Auth::user()->id }}')">Copiar
+                    código</button>
+
+                <!-- Aquí colocamos el bloque de código con fondo oscuro y estilo de código -->
+                <div class="bg-dark text-white p-3 rounded" id="code-container-{{ Auth::user()->id }}">
+                    <code>&lt;iframe
+                        src="{{ url('/public/contact-form/' . Auth::user()->id . '/' . Auth::user()->remember_token) }}"
+                        width="100%" height="600px" frameborder="0"&gt;&lt;/iframe&gt;</code>
+                </div>
+
+
+
                 <div class="card">
                     <div class="card-header bg-primary text-white">
                         Crear Nuevo Contacto
@@ -138,3 +154,24 @@
         </div>
     </div>
 @endsection
+@section('js')
+    <script>
+        function copyCode(containerId) {
+            const codeContainer = document.getElementById(containerId);
+            const code = codeContainer.querySelector('code').innerText;
+
+            navigator.clipboard.writeText(code)
+                .then(() => {
+                    Swal.fire({
+                        icon: 'success',
+                        title: '¡Copiado!',
+                        text: 'El código ha sido copiado al portapapeles.',
+                        showConfirmButton: false,
+                        timer: 1500
+                    });
+                })
+                .catch((error) => {
+                    console.error('Error al copiar el código', error);
+                });
+        }
+    </script>

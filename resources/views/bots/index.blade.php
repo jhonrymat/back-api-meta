@@ -591,5 +591,118 @@
                 });
             });
         });
+
+
+        $(document).ready(function() {
+            var csrfToken = $('meta[name="csrf-token"]').attr('content');
+
+            $('#send-btn').click(function() {
+                sendMessagePrompt();
+            });
+
+            $('#user-input').keypress(function(e) {
+                if (e.which === 13) { // Detecta la tecla Enter
+                    e.preventDefault();
+                    sendMessagePrompt();
+                }
+            });
+
+            function sendMessagePrompt() {
+                var userInput = $('#user-input').val().trim();
+                if (!userInput) return;
+
+                var chatBox = $('#chat-box');
+
+                chatBox.append('<div class="chat-message user-message"><p>' + userInput + '</p></div>');
+                chatBox.scrollTop(chatBox[0].scrollHeight);
+                $('#user-input').val('');
+
+                $.ajax({
+                    url: 'ask-bot',
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken
+                    },
+                    data: {
+                        question: userInput,
+                        waId: '{{ Auth::user()->id }}',
+                        botId: botId
+                    },
+                    success: function(response) {
+
+                        // Asegurar que la respuesta es un string
+                        var answer = response.answer;
+
+                        if (typeof answer === "string" && answer.startsWith("PROMPT:")) {
+                            // Extraer el contenido del prompt eliminando el prefijo
+                            var promptContent = answer.replace("PROMPT:", "").trim();
+                            console.log(promptContent);
+
+                            // Llenar el textarea con el prompt
+
+                            // Asegurar que el textarea existe antes de modificarlo
+                            if ($('#createAssistantInstructions').length) {
+                                $('#createAssistantInstructions').val(promptContent);
+                                console.log("Textarea actualizado con éxito.");
+                            } else {
+                                console.error("No se encontró el textarea.");
+                            }
+
+                            // Cerrar el modal
+                            $('#create-prompt').modal('hide');
+                        } else {
+                            // Si no es un prompt, agregar la respuesta al chat normalmente
+                            var htmlContent = marked.parse(answer);
+                            chatBox.append(
+                                `<div class="chat-message bot-message">${htmlContent}</div>`);
+                            chatBox.scrollTop(chatBox[0].scrollHeight);
+                        }
+                    },
+                    error: function() {
+                        chatBox.append(
+                            '<div class="chat-message bot-message"><p>Error al obtener respuesta, intenta de nuevo.</p></div>'
+                        );
+                    }
+                });
+            }
+
+            // Capturar el clic en el botón "Limpiar chat"
+            $('.modal-header').on('click', '.clear-chat', function() {
+                Swal.fire({
+                    title: '¿Estás seguro?',
+                    text: "Esto eliminará todo el hilo de conversación.",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#3085d6',
+                    confirmButtonText: 'Sí, limpiar chat!',
+                    cancelButtonText: 'No, cancelar!',
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        $.ajax({
+                            url: "{{ route('deleteThread') }}",
+                            type: 'DELETE',
+                            headers: {
+                                'X-CSRF-TOKEN': csrfToken
+                            },
+                            data: {
+                                id: botId
+                            },
+                            success: function(response) {
+                                Swal.fire('Limpio!', response.message, 'success');
+                                $('#chat-box').empty().append(
+                                    '<div class="chat-message bot-message"><p>¡Hola! ¿Cómo puedo ayudarte hoy?</p></div>'
+                                );
+                            },
+                            error: function(xhr) {
+                                Swal.fire('Error!', xhr.responseJSON?.message ||
+                                    'No se pudo eliminar el hilo de conversación.',
+                                    'error');
+                            }
+                        });
+                    }
+                });
+            });
+        });
     </script>
 @stop

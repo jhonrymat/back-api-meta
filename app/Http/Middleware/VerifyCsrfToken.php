@@ -21,5 +21,6 @@ class VerifyCsrfToken extends Middleware
         '/livewire/*',
         '/contact',
         '/livewire/update', // Excluir actualización de Livewire
+        '/public/store-contact',
     ];
 }

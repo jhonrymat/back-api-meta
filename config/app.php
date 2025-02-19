@@ -123,6 +123,10 @@ return [
 
     'cipher' => 'AES-256-CBC',
 
+
+    'assistant_id' => env('ASSISTANT', 'default_id'),
+
+
     /*
     |--------------------------------------------------------------------------
     | Autoloaded Service Providers
