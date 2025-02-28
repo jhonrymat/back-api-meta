@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 
 
 class GroupController extends Controller
@@ -96,81 +97,111 @@ class GroupController extends Controller
 
 
 
+
     public function addRecipient(Request $request, $groupId)
     {
+        
+
         $group = Group::findOrFail($groupId);
+        
 
-        if ($request->method === 'individual') {
-            // Validación y creación de un destinatario individual
-            $validated = $request->validate([
-                'name' => 'nullable|string|max:255',
-                'email' => 'required|email|unique:user_emails,email',
-            ]);
+        if ($request->input('method') === 'file') {
+            
 
-            $recipient = UserEmail::create($validated);
-            $group->userEmails()->attach($recipient->id);
-
-            return redirect()->back()->with('success', 'Destinatario agregado al grupo.');
-        }
-
-        if ($request->method === 'file') {
-            // Validación del archivo CSV
+            // Validación del archivo
             $request->validate([
                 'file' => 'required|file|mimes:csv,txt',
             ]);
 
             $file = $request->file('file');
             $path = $file->getRealPath();
-            $data = array_map('str_getcsv', file($path)); // Convertir CSV en un array
 
-            // Asume que la primera fila contiene los encabezados
+            if (!file_exists($path) || !is_readable($path)) {
+                
+                return redirect()->back()->with('error', 'El archivo no se puede leer.');
+            }
+
+            $delimiter = $this->detectDelimiter($path);
+            
+
+            $data = [];
+            if (($handle = fopen($path, 'r')) !== false) {
+                while (($row = fgetcsv($handle, 1000, $delimiter)) !== false) {
+                    $data[] = $row;
+                }
+                fclose($handle);
+            }
+
+            if (empty($data) || count($data) < 2) {
+                
+                return redirect()->back()->with('error', 'El archivo CSV está vacío o no tiene datos válidos.');
+            }
+
+            // Limpieza de encabezados (eliminamos BOM si existe)
             $headers = array_shift($data);
+            $headers[0] = str_replace("\xEF\xBB\xBF", '', $headers[0]); // Elimina BOM
+            $headers = array_map('trim', $headers);
+            
 
-            $errors = []; // Para registrar errores por fila
+            $errors = [];
             $importedCount = 0;
 
             foreach ($data as $index => $row) {
-                $row = array_combine($headers, $row);
+                
 
-                // Validar cada fila
+                $row = array_map('trim', $row);
+                $row = array_filter($row);
+
+                if (count($row) !== count($headers)) {
+                    
+                    $errors[] = [
+                        'row' => $index + 2,
+                        'errors' => ['La fila tiene un número incorrecto de columnas.'],
+                    ];
+                    continue;
+                }
+
+                $row = array_combine($headers, $row);
+                
+
+                // Validación
                 $validator = Validator::make($row, [
                     'email' => 'required|email|unique:user_emails,email',
                     'name' => 'nullable|string|max:255',
                 ]);
 
                 if ($validator->fails()) {
-                    // Registrar el error con el número de fila
+                    
                     $errors[] = [
-                        'row' => $index + 2, // +2 porque la primera fila es encabezado y las filas del CSV inician en 1
+                        'row' => $index + 2,
                         'errors' => $validator->errors()->all(),
                     ];
                     continue;
                 }
 
-                // Crear el destinatario y asociarlo al grupo
+                // Crear destinatario si no existe y asociarlo al grupo
                 $validated = $validator->validated();
-                $recipient = UserEmail::create($validated);
-                $group->userEmails()->attach($recipient->id);
+                $recipient = UserEmail::firstOrCreate(['email' => $validated['email']], $validated);
+                
+
+                $group->userEmails()->syncWithoutDetaching([$recipient->id]);
+                
                 $importedCount++;
             }
 
-            // Manejar el resultado de la importación
-            if (count($errors) > 0) {
+            if (!empty($errors)) {
                 $errorFile = 'errors_' . now()->timestamp . '.csv';
-                $errorData = array_map(function ($error) {
-                    return [
-                        'Fila' => $error['row'],
-                        'Error' => implode(', ', $error['errors']),
-                    ];
-                }, $errors);
+                $errorPath = storage_path("app/public/$errorFile");
 
-                // Generar el archivo CSV
-                $handle = fopen(storage_path("app/public/$errorFile"), 'w');
+                $handle = fopen($errorPath, 'w');
                 fputcsv($handle, ['Fila', 'Errores']);
-                foreach ($errorData as $line) {
-                    fputcsv($handle, $line);
+
+                foreach ($errors as $error) {
+                    fputcsv($handle, [$error['row'], implode(', ', $error['errors'])]);
                 }
+
                 fclose($handle);
+                
 
                 return redirect()->back()
                     ->with('errors', $errors)
@@ -178,11 +209,36 @@ class GroupController extends Controller
                     ->with('success', "$importedCount destinatarios importados correctamente. Algunos registros tienen errores.");
             }
 
+            
+
             return redirect()->back()->with('success', 'Todos los destinatarios fueron importados correctamente.');
         }
 
+        
         return redirect()->back()->with('error', 'Método no válido.');
     }
+
+    function detectDelimiter($filePath)
+    {
+        $delimiters = [",", ";", "\t"]; // Detectamos comas, punto y coma, y tabulaciones
+        $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+
+        if (!$lines || count($lines) < 2) {
+            return ",";
+        }
+
+        $firstLine = $lines[0];
+        $delimiterCounts = [];
+
+        foreach ($delimiters as $delimiter) {
+            $delimiterCounts[$delimiter] = substr_count($firstLine, $delimiter);
+        }
+
+        // El delimitador que más repeticiones tenga es el correcto
+        return array_search(max($delimiterCounts), $delimiterCounts);
+    }
+
+
 
 
 
