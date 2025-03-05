@@ -77,18 +77,21 @@
     <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
     <script>
-        new DataTable('#enviosTable', {
-            "order": [
-                [0, "desc"]
-            ] // Ordenar por la primera columna (created_at) de manera descendente
-        });
-    </script>
-    <script>
         $(document).ready(function() {
-            $('.status-select').change(function() {
+            var table = new DataTable('#enviosTable', {
+                "order": [
+                    [0, "desc"]
+                ],
+                "processing": true,
+                "serverSide": false, // Si estás usando AJAX para obtener los datos, ponlo en true
+                "paging": true
+            });
+
+            // Delegar evento para elementos dinámicos en la tabla
+            $(document).on('change', '.status-select', function() {
                 var status = $(this).val();
                 var id = $(this).data('id');
-                var statusUrl = "{{ route('update.status') }}";
+                var statusUrl = "{{ route('update.status.clocal') }}";
                 var badge = $(this).closest('td').find('.badge');
 
                 $.ajax({
@@ -101,17 +104,13 @@
                     },
                     success: function(response) {
                         if (response.success) {
-                            var badgeClass = '';
-                            if (status === 'enviado') {
-                                badgeClass = 'badge-success';
-                            } else if (status === 'cancelado') {
-                                badgeClass = 'badge-danger';
-                            } else {
-                                badgeClass = 'badge-warning';
-                            }
+                            let badgeClass = 'badge-warning';
+                            if (status === 'enviado') badgeClass = 'badge-success';
+                            if (status === 'cancelado') badgeClass = 'badge-danger';
 
-                            badge.attr('class', 'badge ' + badgeClass + ' badge-pill').text(
-                                status);
+                            badge.removeClass('badge-warning badge-success badge-danger')
+                                .addClass(badgeClass)
+                                .text(status.charAt(0).toUpperCase() + status.slice(1));
 
                             Swal.fire({
                                 icon: 'success',
@@ -127,7 +126,7 @@
                             });
                         }
                     },
-                    error: function(xhr, status, error) {
+                    error: function(xhr) {
                         Swal.fire({
                             icon: 'error',
                             title: 'Error',

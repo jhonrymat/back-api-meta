@@ -6,10 +6,14 @@ use App\Models\Group;
 use App\Models\UserEmail;
 use App\Jobs\SendEmailJob;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Log;
+use App\Imports\UsersImport;
+use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Support\Facades\Queue;
 
 
 class GroupController extends Controller
@@ -100,143 +104,40 @@ class GroupController extends Controller
 
     public function addRecipient(Request $request, $groupId)
     {
-        
-
         $group = Group::findOrFail($groupId);
-        
 
         if ($request->input('method') === 'file') {
-            
 
-            // Validación del archivo
+            // Validar archivo
             $request->validate([
-                'file' => 'required|file|mimes:csv,txt',
+                'file' => 'required|file|mimes:csv,txt|max:5120',
             ]);
 
             $file = $request->file('file');
-            $path = $file->getRealPath();
 
-            if (!file_exists($path) || !is_readable($path)) {
-                
-                return redirect()->back()->with('error', 'El archivo no se puede leer.');
-            }
+            // Procesar en segundo plano
+            Excel::queueImport(new UsersImport($group), $file);
 
-            $delimiter = $this->detectDelimiter($path);
-            
-
-            $data = [];
-            if (($handle = fopen($path, 'r')) !== false) {
-                while (($row = fgetcsv($handle, 1000, $delimiter)) !== false) {
-                    $data[] = $row;
-                }
-                fclose($handle);
-            }
-
-            if (empty($data) || count($data) < 2) {
-                
-                return redirect()->back()->with('error', 'El archivo CSV está vacío o no tiene datos válidos.');
-            }
-
-            // Limpieza de encabezados (eliminamos BOM si existe)
-            $headers = array_shift($data);
-            $headers[0] = str_replace("\xEF\xBB\xBF", '', $headers[0]); // Elimina BOM
-            $headers = array_map('trim', $headers);
-            
-
-            $errors = [];
-            $importedCount = 0;
-
-            foreach ($data as $index => $row) {
-                
-
-                $row = array_map('trim', $row);
-                $row = array_filter($row);
-
-                if (count($row) !== count($headers)) {
-                    
-                    $errors[] = [
-                        'row' => $index + 2,
-                        'errors' => ['La fila tiene un número incorrecto de columnas.'],
-                    ];
-                    continue;
-                }
-
-                $row = array_combine($headers, $row);
-                
-
-                // Validación
-                $validator = Validator::make($row, [
-                    'email' => 'required|email|unique:user_emails,email',
-                    'name' => 'nullable|string|max:255',
-                ]);
-
-                if ($validator->fails()) {
-                    
-                    $errors[] = [
-                        'row' => $index + 2,
-                        'errors' => $validator->errors()->all(),
-                    ];
-                    continue;
-                }
-
-                // Crear destinatario si no existe y asociarlo al grupo
-                $validated = $validator->validated();
-                $recipient = UserEmail::firstOrCreate(['email' => $validated['email']], $validated);
-                
-
-                $group->userEmails()->syncWithoutDetaching([$recipient->id]);
-                
-                $importedCount++;
-            }
-
-            if (!empty($errors)) {
-                $errorFile = 'errors_' . now()->timestamp . '.csv';
-                $errorPath = storage_path("app/public/$errorFile");
-
-                $handle = fopen($errorPath, 'w');
-                fputcsv($handle, ['Fila', 'Errores']);
-
-                foreach ($errors as $error) {
-                    fputcsv($handle, [$error['row'], implode(', ', $error['errors'])]);
-                }
-
-                fclose($handle);
-                
-
-                return redirect()->back()
-                    ->with('errors', $errors)
-                    ->with('errorFile', "/storage/$errorFile")
-                    ->with('success', "$importedCount destinatarios importados correctamente. Algunos registros tienen errores.");
-            }
-
-            
-
-            return redirect()->back()->with('success', 'Todos los destinatarios fueron importados correctamente.');
+            return redirect()->back()->with('success', 'La importación está en proceso. Te notificaremos cuando finalice.');
         }
 
-        
+        if ($request->input('method') === 'individual') {
+            // Validación y creación de un destinatario individual
+            $validated = $request->validate([
+                'name' => 'nullable|string|max:255',
+                'email' => 'required|email',
+            ]);
+
+            $recipient = UserEmail::create($validated);
+            $group->userEmails()->attach($recipient->id);
+
+            return redirect()->back()->with('success', 'Destinatario agregado al grupo.');
+        }
+
         return redirect()->back()->with('error', 'Método no válido.');
     }
 
-    function detectDelimiter($filePath)
-    {
-        $delimiters = [",", ";", "\t"]; // Detectamos comas, punto y coma, y tabulaciones
-        $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
 
-        if (!$lines || count($lines) < 2) {
-            return ",";
-        }
-
-        $firstLine = $lines[0];
-        $delimiterCounts = [];
-
-        foreach ($delimiters as $delimiter) {
-            $delimiterCounts[$delimiter] = substr_count($firstLine, $delimiter);
-        }
-
-        // El delimitador que más repeticiones tenga es el correcto
-        return array_search(max($delimiterCounts), $delimiterCounts);
-    }
 
 
 
@@ -256,7 +157,7 @@ class GroupController extends Controller
 
         $validated = $request->validate([
             'name' => 'nullable|string|max:255',
-            'email' => 'required|email|unique:user_emails,email,' . $recipientId,
+            'email' => 'required|email',
         ]);
 
         $recipient = UserEmail::findOrFail($recipientId);

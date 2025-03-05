@@ -100,13 +100,14 @@ class ClocalController extends Controller
     public function updateStatus(Request $request)
     {
         $app = Clocal::find($request->id);
-        if ($app) {
-            $app->status = $request->status;
-            $app->save();
-
-            return response()->json(['success' => true, 'message' => 'Estado actualizado correctamente.']);
+        if (!$app) {
+            return response()->json(['success' => false, 'message' => 'Aplicación no encontrada.'], 404);
         }
 
-        return response()->json(['success' => false, 'message' => 'No se encontró la aplicación.']);
+        $app->status = $request->status;
+        $app->save();
+
+        return response()->json(['success' => true, 'message' => 'Estado actualizado correctamente.']);
+
     }
 }
