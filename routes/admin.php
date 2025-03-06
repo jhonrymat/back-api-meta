@@ -205,6 +205,9 @@ Route::resource(
     'bots',
     BotController::class,
 )->names('bots')->middleware('auth');
+Route::post('guardar-webhook', [BotController::class, 'guardarWebhook']);
+Route::get('verificar-webhook/{botId}', [BotController::class, 'verificarWebhook']);
+
 
 // ruta de bot, bots.leads
 Route::get('leads', [LeadsController::class, 'index'])->name('leads');

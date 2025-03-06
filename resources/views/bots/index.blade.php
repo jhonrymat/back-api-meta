@@ -60,7 +60,7 @@
                             data-botid="{{ $bot->id }}" data-openaiassistant="{{ $bot->id }}" title="Editar">
                             <i class="fa fa-edit"></i>
                         </a>
-                        <button class="btn btn-danger btn-sm mb-2 deleteBot" data-botid="{{ $bot->id }}">
+                        <button class="btn btn-danger btn-sm mb-2 deleteBot" data-botid="{{ $bot->id }}" title="Eliminar">
                             <i class="fa fa-trash"></i>
                         </button>
                         <a data-toggle="modal" data-target="#modal-bot-{{ $bot->id }}"
@@ -68,9 +68,14 @@
                             <i class="fa fa-robot"></i>
                         </a>
                         <a data-toggle="modal" data-target="#modal-code-{{ $bot->id }}"
-                            class="btn btn-warning btn-sm mb-2 Bot" title="Bot">
+                            class="btn btn-warning btn-sm mb-2 Bot" title="Incrustar">
                             <i class="fas fa-code"></i>
                         </a>
+                        {{-- webhook --}}
+                        <button class="btn btn-info btn-sm mb-2" data-toggle="modal"
+                            data-target="#webhookModal-{{ $bot->id }}" title="Webhook">
+                            <i class="fa fa-link"></i>
+                        </button>
                     </td>
                     <td>{{ $bot->openai_key }}</td>
                 </tr>
@@ -78,6 +83,7 @@
                 @include('bots.modals.edit-modal', ['bot' => $bot])
                 @include('bots.modals.bot-modal', ['bot' => $bot])
                 @include('bots.modals.code-modal', ['bot' => $bot])
+                @include('bots.modals.webhook-modal', ['bot' => $bot])
             @endforeach
         </tbody>
     </table>
@@ -705,4 +711,42 @@
             });
         });
     </script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            document.addEventListener("click", function(event) {
+                if (event.target.classList.contains("saveWebhook")) {
+                    let botId = event.target.getAttribute("data-botid");
+                    let webhookUrl = document.getElementById(`webhook_url_${botId}`).value;
+
+                    if (!webhookUrl.startsWith('http://') && !webhookUrl.startsWith('https://')) {
+                        alert('La URL del webhook debe comenzar con http:// o https://');
+                        return;
+                    }
+
+                    // Guardar la URL sin verificarla
+                    fetch('guardar-webhook', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')
+                                    .getAttribute('content')
+                            },
+                            body: JSON.stringify({
+                                webhook_url: webhookUrl,
+                                bot_id: botId
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            alert(data.message);
+                            location.reload();
+                        })
+                        .catch(error => {
+                            alert('Error al guardar el webhook: ' + error.message);
+                        });
+                }
+            });
+        });
+    </script>
+
 @stop

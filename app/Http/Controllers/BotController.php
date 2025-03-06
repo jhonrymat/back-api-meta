@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Bot;
+use Log;
 use OpenAI\Factory;
 use App\Models\Aplicaciones;
 use Illuminate\Http\Request;
 use OpenAI\Laravel\Facades\OpenAI;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 
 class BotController extends Controller
 {
@@ -385,7 +387,20 @@ class BotController extends Controller
     }
 
 
+    public function guardarWebhook(Request $request)
+    {
+        $request->validate([
+            'webhook_url' => 'required|url'
+        ]);
 
+        $bot = Bot::findOrFail($request->bot_id);
 
+        if (!$bot) {
+            return response()->json(['message' => 'Bot no encontrado'], 404);
+        }
 
+        $bot->update(['webhook_url' => $request->webhook_url]);
+
+        return response()->json(['message' => 'Webhook guardado correctamente']);
+    }
 }
