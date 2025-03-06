@@ -249,4 +249,44 @@
         });
     </script>
 
+    <script src="https://js.pusher.com/7.0/pusher.min.js"></script>
+    <script src="{{ asset('js/app.js') }}"></script>
+
+    <script>
+        Pusher.logToConsole = true;
+
+        var pusher = new Pusher("{{ env('PUSHER_APP_KEY') }}", {
+            cluster: "{{ env('PUSHER_APP_CLUSTER') }}",
+            encrypted: true
+        });
+
+        var channel = pusher.subscribe('import-channel');
+
+        // 🔹 Escuchar evento con el namespace completo
+        channel.bind('App\\Events\\ImportCompleted', function(data) {
+            console.log("📢 Evento recibido:", data);
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Importación Completada',
+                text: data.message,
+                confirmButtonText: 'OK', // 🔹 Botón de confirmación
+                allowOutsideClick: false, // 🔹 Evita cerrar fuera del cuadro
+                allowEscapeKey: false // 🔹 Evita cerrar con tecla Escape
+            });
+        });
+
+        // ❌ Importación Fallida
+        channel.bind('App\\Events\\ImportFailed', function(data) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error en la Importación',
+                text: data.message,
+                confirmButtonText: 'OK',
+                allowOutsideClick: false,
+                allowEscapeKey: false
+            });
+        });
+    </script>
+
 @endsection

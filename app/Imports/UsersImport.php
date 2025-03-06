@@ -2,11 +2,13 @@
 namespace App\Imports;
 
 use App\Models\UserEmail;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use App\Events\ImportFailed;
+use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Concerns\ToModel;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithBatchInserts;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
-use Maatwebsite\Excel\Concerns\WithHeadingRow;
 
 class UsersImport implements ToModel, WithBatchInserts, WithChunkReading, WithHeadingRow, ShouldQueue
 {
@@ -17,17 +19,17 @@ class UsersImport implements ToModel, WithBatchInserts, WithChunkReading, WithHe
         $this->group = $group;
     }
 
+
     public function model(array $row)
     {
-        // Validar que el correo no sea nulo
-        if (!isset($row['email']) || !filter_var($row['email'], FILTER_VALIDATE_EMAIL)) {
-            return null; // Ignorar filas sin email válido
-        }
+        try {
+            // Validar que el correo no sea nulo
+            if (!isset($row['email']) || !filter_var($row['email'], FILTER_VALIDATE_EMAIL)) {
+                Log::warning('🚨 Correo ignorado en importación: ' . ($row['email'] ?? 'N/A'));
+                return null; // Ignorar filas sin email válido
+            }
 
-        // 🔹 Evitar duplicados antes de insertar
-        $existingUser = UserEmail::where('email', $row['email'])->first();
-
-        if (!$existingUser) {
+            // 🔹 Insertar siempre un nuevo usuario (permitiendo duplicados)
             $user = UserEmail::create([
                 'name' => $row['name'] ?? null,
                 'email' => trim($row['email']),
@@ -35,13 +37,15 @@ class UsersImport implements ToModel, WithBatchInserts, WithChunkReading, WithHe
 
             // Relacionar con el grupo
             $this->group->userEmails()->attach($user->id);
-        } else {
-            // Si ya existe, solo lo asociamos al grupo sin insertarlo
-            $this->group->userEmails()->syncWithoutDetaching([$existingUser->id]);
+        } catch (\Exception $e) {
+            // 🔹 Loguear el error y disparar el evento de error
+            Log::error('❌ Error en la importación: ' . $e->getMessage());
+            event(new ImportFailed('La importación falló: ' . $e->getMessage()));
         }
 
-        return null; // Evitar que Laravel Excel intente crear duplicados
+        return null; // Evitar que Laravel Excel intente crear duplicados automáticamente
     }
+
 
     public function batchSize(): int
     {

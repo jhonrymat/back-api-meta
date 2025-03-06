@@ -5,15 +5,16 @@ namespace App\Http\Controllers;
 use App\Models\Group;
 use App\Models\UserEmail;
 use App\Jobs\SendEmailJob;
+use App\Imports\UsersImport;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Validator;
-use App\Imports\UsersImport;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
+use App\Jobs\NotifyUserOfCompletedImport;
+use Illuminate\Support\Facades\Validator;
 
 
 class GroupController extends Controller
@@ -116,7 +117,10 @@ class GroupController extends Controller
             $file = $request->file('file');
 
             // Procesar en segundo plano
-            Excel::queueImport(new UsersImport($group), $file);
+            Excel::queueImport(new UsersImport($group), $file)
+                ->chain([
+                    new NotifyUserOfCompletedImport(auth()->user()), // 🔹 Enviar notificación al usuario cuando termine
+                ]);
 
             return redirect()->back()->with('success', 'La importación está en proceso. Te notificaremos cuando finalice.');
         }
