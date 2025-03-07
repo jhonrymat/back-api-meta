@@ -591,7 +591,6 @@
             // Capturar el clic en el botón "Limpiar chat"
             $('.modal-header').on('click', '.clear-chat-agente', function() {
                 var agente_Id = $(this).data('agente-id');
-                console.log("1" + agente_Id);
                 Swal.fire({
                     title: '¿Estás seguro?',
                     text: "Esto eliminará todo el hilo de conversación.",
@@ -679,7 +678,6 @@
                         if (typeof answer === "string" && answer.startsWith("PROMPT:")) {
                             // Extraer el contenido del prompt eliminando el prefijo
                             var promptContent = answer.replace("PROMPT:", "").trim();
-                            console.log(promptContent);
 
                             // Llenar el textarea con el prompt
 

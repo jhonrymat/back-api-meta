@@ -58,31 +58,26 @@ class BotIA extends Controller
             if ($request->hasFile('image')) {
                 $imagePath = $request->file('image')->store('images', 'public');
                 $imageUrl = asset('storage/' . $imagePath);
-                Log::info('Imagen guardada en: ' . $imageUrl);
             }
 
-            // 🔹 Si hay imagen y texto, procesar ambos
-            if ($imageUrl) {
-                $botResponse = $this->processImageAndText($imageUrl, $question, $botId, $bot->openai_key, $bot->openai_org, $bot->openai_assistant, $user->phone);
-            } elseif (!empty($question)) {
-                // 🔹 Si solo hay texto, procesarlo normalmente
-                $botResponse = $this->ask($question, $user->phone, $botId, $bot->openai_key, $bot->openai_org, $bot->openai_assistant);
+            if (!empty($question) || $imageUrl !== null) {
+                // Llamar a la función ask para obtener la respuesta del bot
+                $botResponse = $this->ask($question, $user->phone, $botId, $bot->openai_key, $bot->openai_org, $bot->openai_assistant, $imageUrl);
             } else {
+                Log::warning('❌ Intento de consulta sin pregunta ni imagen.');
                 return response()->json(['error' => 'Debes enviar una pregunta o una imagen.'], 400);
             }
-            // Llamar a la función ask para obtener la respuesta del bot
 
             return response()->json([
                 'answer' => $botResponse,  // Devolver la respuesta del bot en formato JSON
             ]);
         } catch (\Exception $e) {
-            Log::error('Error en askBot: ' . $e->getMessage());
             return response()->json(['error' => 'Ocurrió un error al procesar la solicitud.'], 500);
         }
 
     }
 
-    private function processImageAndText($imageUrl, $question, $botId, $openai_key, $openai_org, $openai_assistant, $waId)
+    private function processImageAndText($imageUrl, $question, $botId, $openai_key, $openai_org, $openai_assistant, $waId, $threadId)
     {
         try {
             $openAI = (new Factory())
@@ -104,20 +99,10 @@ class BotIA extends Controller
                 return 'Error: OpenAI no puede acceder a la imagen.';
             }
 
-            // Buscar o crear un thread
-            $thread = Thread::where('wa_id', $waId)->where('bot_id', $botId)->first();
-            if (!$thread) {
-                $threadRun = $this->createAndRunThread($openai_key, $openai_org, $openai_assistant);
-                $thread = Thread::create([
-                    'wa_id' => $waId,
-                    'thread_id' => $threadRun->threadId,
-                    'bot_id' => $botId,
-                ]);
-            }
 
             // Enviar mensaje con imagen y texto al asistente
             $messageResponse = $openAI->threads()->messages()->create(
-                threadId: $thread->thread_id,
+                threadId: $threadId,
                 parameters: [
                     'role' => 'user',
                     'content' => [
@@ -133,7 +118,7 @@ class BotIA extends Controller
 
             // Ejecutar el asistente
             $run = $openAI->threads()->runs()->create(
-                threadId: $thread->thread_id,
+                threadId: $threadId,
                 parameters: [
                     'assistant_id' => $bot->openai_assistant,
                 ]
@@ -150,7 +135,7 @@ class BotIA extends Controller
             do {
                 sleep(2);
                 $elapsed += 2;
-                $runStatus = $openAI->threads()->runs()->retrieve($thread->thread_id, $run->id);
+                $runStatus = $openAI->threads()->runs()->retrieve($threadId, $run->id);
 
                 if ($elapsed >= $timeout) {
                     throw new \Exception('Timeout al procesar la imagen.');
@@ -162,7 +147,7 @@ class BotIA extends Controller
             }
 
             // Obtener la respuesta final del asistente
-            $messages = $openAI->threads()->messages()->list($thread->thread_id);
+            $messages = $openAI->threads()->messages()->list($threadId);
 
             if (!isset($messages->data[0]->content[0]->text->value)) {
                 throw new \Exception('No se recibió respuesta.');
@@ -227,7 +212,7 @@ class BotIA extends Controller
     }
 
 
-    public function ask($question, $waId, $botId, $openai_key, $openai_org, $openai_assistant)
+    public function ask($question, $waId, $botId, $openai_key, $openai_org, $openai_assistant, $imageUrl)
     {
         $this->question = $question;
 
@@ -248,6 +233,9 @@ class BotIA extends Controller
                 'thread_id' => $threadRun->threadId,
                 'bot_id' => $botId,
             ]);
+        } else {
+            // Si existe un hilo, usar el hilo existente
+            $threadRun = $this->continueThread($thread->thread_id, $openai_key, $openai_org, $openai_assistant);
         }
 
         if ($webhookUrl) {
@@ -256,6 +244,7 @@ class BotIA extends Controller
             try {
                 $response = Http::post($webhookUrl, [
                     'message' => $question,
+                    'image_url' => $imageUrl,
                     'thread_id' => $thread->thread_id,
                 ]);
 
@@ -269,10 +258,16 @@ class BotIA extends Controller
                 $this->answer = 'Hubo un problema al procesar tu mensaje.';
             }
         } else {
-            // 🔹 Si NO hay un webhook, usar OpenAI directamente
-            // Si existe un hilo, usar el hilo existente
-            $threadRun = $this->continueThread($thread->thread_id, $openai_key, $openai_org, $openai_assistant);
-            return $this->loadAnswer($threadRun, $openai_key, $openai_org, $openai_assistant, $botId);
+            // 🔹 Si hay imagen y texto, procesar ambos
+            if ($imageUrl) {
+                $botResponse = $this->processImageAndText($imageUrl, $question, $botId, $bot->openai_key, $bot->openai_org, $bot->openai_assistant, $waId, $thread->thread_id);
+            } elseif (!empty($question)) {
+                // 🔹 Si NO hay un webhook, usar OpenAI directamente
+                return $this->loadAnswer($threadRun, $openai_key, $openai_org, $openai_assistant, $botId);
+            } else {
+                return response()->json(['error' => 'Debes enviar una pregunta o una imagen.'], 400);
+            }
+
         }
 
         return $this->answer;
@@ -464,7 +459,8 @@ class BotIA extends Controller
                 $botId,
                 $bot->openai_key,
                 $bot->openai_org,
-                $bot->openai_assistant
+                $bot->openai_assistant,
+                $imageUrl = null
             );
 
             return response()->json(['answer' => $botResponse]);
@@ -484,21 +480,18 @@ class BotIA extends Controller
             if (!$bot_id) {
                 return response()->json(['message' => 'El ID del bot es requerido'], 400);
             }
-            Log::info("Bot ID: $bot_id");
 
             // Obtener el bot con el ID
             $bot = Bot::find($bot_id);
             if (!$bot) {
                 return response()->json(['message' => 'El bot no existe'], 404);
             }
-            Log::info("Bot encontrado: $bot->nombre");
 
             // Obtener el usuario autenticado
             $user = Auth::user();
             if (!$user) {
                 return response()->json(['message' => 'Usuario no autenticado'], 401);
             }
-            Log::info("Usuario autenticado: $user->phone");
 
             // Buscar el hilo asociado al usuario y al bot
             $thread = Thread::where('wa_id', $user->phone)
