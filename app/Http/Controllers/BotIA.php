@@ -12,6 +12,7 @@ use OpenAI\Laravel\Facades\OpenAI;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use OpenAI\Responses\Threads\Runs\ThreadRunResponse;
 
 class BotIA extends Controller
@@ -50,12 +51,26 @@ class BotIA extends Controller
                 return response()->json(['error' => 'No se encontró el número de teléfono del usuario.'], 400);
             }
 
-            $question = $request->input('question');
-            if (!$question) {
-                return response()->json(['error' => 'La pregunta es obligatoria.'], 400);
+            $question = $request->input('question', '');
+            $imageUrl = null;
+
+            // 🔹 Si el usuario envió una imagen, guardarla y obtener la URL pública
+            if ($request->hasFile('image')) {
+                $imagePath = $request->file('image')->store('images', 'public');
+                $imageUrl = asset('storage/' . $imagePath);
+                Log::info('Imagen guardada en: ' . $imageUrl);
+            }
+
+            // 🔹 Si hay imagen y texto, procesar ambos
+            if ($imageUrl) {
+                $botResponse = $this->processImageAndText($imageUrl, $question, $botId, $bot->openai_key, $bot->openai_org, $bot->openai_assistant, $user->phone);
+            } elseif (!empty($question)) {
+                // 🔹 Si solo hay texto, procesarlo normalmente
+                $botResponse = $this->ask($question, $user->phone, $botId, $bot->openai_key, $bot->openai_org, $bot->openai_assistant);
+            } else {
+                return response()->json(['error' => 'Debes enviar una pregunta o una imagen.'], 400);
             }
             // Llamar a la función ask para obtener la respuesta del bot
-            $botResponse = $this->ask($question, $user->phone, $botId, $bot->openai_key, $bot->openai_org, $bot->openai_assistant);
 
             return response()->json([
                 'answer' => $botResponse,  // Devolver la respuesta del bot en formato JSON
@@ -66,6 +81,105 @@ class BotIA extends Controller
         }
 
     }
+
+    private function processImageAndText($imageUrl, $question, $botId, $openai_key, $openai_org, $openai_assistant, $waId)
+    {
+        try {
+            $openAI = (new Factory())
+                ->withApiKey($openai_key)
+                ->withOrganization($openai_org)
+                ->withHttpHeader('OpenAI-Beta', 'assistants=v2')
+                ->make();
+
+            // Verificar que la URL sea accesible
+            if (!filter_var($imageUrl, FILTER_VALIDATE_URL)) {
+                Log::error('URL inválida generada para la imagen: ' . $imageUrl);
+                return 'Error: No se pudo generar una URL válida para la imagen.';
+            }
+            $bot = Bot::find($botId);
+            // Verificar si la imagen es accesible
+            $imageHeaders = @get_headers($imageUrl);
+            if (!$imageHeaders || strpos($imageHeaders[0], '200') === false) {
+                Log::error('OpenAI no puede acceder a la imagen: ' . $imageUrl);
+                return 'Error: OpenAI no puede acceder a la imagen.';
+            }
+
+            // Buscar o crear un thread
+            $thread = Thread::where('wa_id', $waId)->where('bot_id', $botId)->first();
+            if (!$thread) {
+                $threadRun = $this->createAndRunThread($openai_key, $openai_org, $openai_assistant);
+                $thread = Thread::create([
+                    'wa_id' => $waId,
+                    'thread_id' => $threadRun->threadId,
+                    'bot_id' => $botId,
+                ]);
+            }
+
+            // Enviar mensaje con imagen y texto al asistente
+            $messageResponse = $openAI->threads()->messages()->create(
+                threadId: $thread->thread_id,
+                parameters: [
+                    'role' => 'user',
+                    'content' => [
+                        ['type' => 'text', 'text' => $question ?: 'Describe esta imagen.'],
+                        ['type' => 'image_url', 'image_url' => ['url' => $imageUrl]],
+                    ],
+                ]
+            );
+
+            if (!$messageResponse) {
+                throw new \Exception('Error al enviar el mensaje con imagen.');
+            }
+
+            // Ejecutar el asistente
+            $run = $openAI->threads()->runs()->create(
+                threadId: $thread->thread_id,
+                parameters: [
+                    'assistant_id' => $bot->openai_assistant,
+                ]
+            );
+
+            if (!$run) {
+                throw new \Exception('Error al ejecutar el asistente.');
+            }
+
+            // Esperar respuesta de OpenAI con un timeout extendido
+            $timeout = 60; // Aumentado a 60 segundos
+            $elapsed = 0;
+
+            do {
+                sleep(2);
+                $elapsed += 2;
+                $runStatus = $openAI->threads()->runs()->retrieve($thread->thread_id, $run->id);
+
+                if ($elapsed >= $timeout) {
+                    throw new \Exception('Timeout al procesar la imagen.');
+                }
+            } while (in_array($runStatus->status, ['queued', 'in_progress']));
+
+            if ($runStatus->status !== 'completed') {
+                throw new \Exception('Error al procesar la imagen con el asistente.');
+            }
+
+            // Obtener la respuesta final del asistente
+            $messages = $openAI->threads()->messages()->list($thread->thread_id);
+
+            if (!isset($messages->data[0]->content[0]->text->value)) {
+                throw new \Exception('No se recibió respuesta.');
+            }
+
+            Log::info('Respuesta del asistente: ' . $messages->data[0]->content[0]->text->value);
+
+            return $messages->data[0]->content[0]->text->value;
+
+        } catch (\Exception $e) {
+            Log::error('Error en processImageAndText: ' . $e->getMessage());
+            return 'Ocurrió un error al procesar la imagen: ' . $e->getMessage();
+        }
+    }
+
+
+
 
 
 

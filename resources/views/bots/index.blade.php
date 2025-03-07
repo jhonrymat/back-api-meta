@@ -60,7 +60,8 @@
                             data-botid="{{ $bot->id }}" data-openaiassistant="{{ $bot->id }}" title="Editar">
                             <i class="fa fa-edit"></i>
                         </a>
-                        <button class="btn btn-danger btn-sm mb-2 deleteBot" data-botid="{{ $bot->id }}" title="Eliminar">
+                        <button class="btn btn-danger btn-sm mb-2 deleteBot" data-botid="{{ $bot->id }}"
+                            title="Eliminar">
                             <i class="fa fa-trash"></i>
                         </button>
                         <a data-toggle="modal" data-target="#modal-bot-{{ $bot->id }}"
@@ -479,47 +480,70 @@
 
             function sendMessage(botId) {
                 var userInput = $('#user-input-' + botId).val(); // Selecciona el input correcto
+                var imageInput = $('#image-input-' + botId)[0].files[0]; // Obtener imagen
 
-                if (userInput.trim()) {
-                    var chatBox = $('#chat-box-' + botId); // Selecciona el chat-box correcto
-
-                    // Agregar mensaje del usuario al chat
-                    chatBox.append(
-                        '<div class="chat-message user-message"><p>' + userInput + '</p></div>'
-                    );
-                    chatBox.scrollTop(chatBox[0]
-                        .scrollHeight); // Desplazarse hacia el último mensaje
-                    $('#user-input-' + botId).val(''); // Limpiar el input
-
-                    // Enviar pregunta al servidor usando AJAX
-                    $.ajax({
-                        url: 'ask-bot', // La ruta que define en tu Laravel para interactuar con el controlador
-                        method: 'POST',
-                        data: {
-                            question: userInput,
-                            _token: '{{ csrf_token() }}', // Token CSRF
-                            waId: '{{ Auth::user()->id }}', // ID del usuario autenticado
-                            botId: botId // Enviar el ID del bot específico
-                        },
-                        success: function(response) {
-                            var chatBox = $('#chat-box-' + botId);
-
-                            // Usar `marked.parse` para convertir Markdown a HTML
-                            var htmlContent = marked.parse(response.answer);
-
-                            chatBox.append(
-                                `<div class="chat-message bot-message">${htmlContent}</div>`
-                            );
-                            chatBox.scrollTop(chatBox[0]
-                                .scrollHeight); // Desplazarse hacia el último mensaje
-                        },
-                        error: function() {
-                            chatBox.append(
-                                '<div class="chat-message bot-message"><p>Error al obtener respuesta, intenta de nuevo.</p></div>'
-                            );
-                        }
-                    });
+                if (!userInput.trim() && !imageInput) {
+                    return; // No enviar si no hay texto ni imagen
                 }
+
+                var chatBox = $('#chat-box-' + botId); // Selecciona el chat-box correcto
+
+                // Mostrar mensaje del usuario
+                if (userInput.trim()) {
+                    chatBox.append(`<div class="chat-message user-message"><p>${userInput}</p></div>`);
+                }
+
+                if (imageInput) {
+                    var reader = new FileReader();
+                    reader.onload = function(e) {
+                        chatBox.append(`<div class="chat-message user-message">
+                                    <img src="${e.target.result}" alt="Imagen enviada" style="max-width: 200px; border-radius: 5px;">
+                                </div>`);
+                    };
+                    reader.readAsDataURL(imageInput);
+                }
+
+                chatBox.scrollTop(chatBox[0]
+                    .scrollHeight); // Desplazarse hacia el último mensaje
+                $('#user-input-' + botId).val(''); // Limpiar el input
+
+                // Crear FormData para enviar datos al backend
+                var formData = new FormData();
+                formData.append('botId', botId);
+                formData.append('_token', '{{ csrf_token() }}'); // CSRF
+                if (userInput.trim()) {
+                    formData.append('question', userInput);
+                }
+                if (imageInput) {
+                    formData.append('image', imageInput);
+                }
+
+                // Enviar pregunta al servidor usando AJAX
+                $.ajax({
+                    url: 'ask-bot', // La ruta que define en tu Laravel para interactuar con el controlador
+                    method: 'POST',
+                    data: formData,
+                    processData: false, // Necesario para FormData
+                    contentType: false, // Necesario para FormData
+                    success: function(response) {
+                        var chatBox = $('#chat-box-' + botId);
+
+                        // Usar `marked.parse` para convertir Markdown a HTML
+                        var htmlContent = marked.parse(response.answer);
+
+                        chatBox.append(
+                            `<div class="chat-message bot-message">${htmlContent}</div>`
+                        );
+                        chatBox.scrollTop(chatBox[0]
+                            .scrollHeight); // Desplazarse hacia el último mensaje
+                    },
+                    error: function() {
+                        chatBox.append(
+                            '<div class="chat-message bot-message"><p>Error al obtener respuesta, intenta de nuevo.</p></div>'
+                        );
+                    }
+                });
+
             }
         });
 
