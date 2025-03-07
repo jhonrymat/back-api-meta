@@ -477,26 +477,75 @@ class BotIA extends Controller
     // delete thread
     public function deleteThread(Request $request)
     {
-        $bot_id = $request->input('id');
-        // obtener el bot con el id
-        $bot = Bot::find($bot_id);
-        // obtener el usuario autenticado
-        $user = Auth::user();
-        // validar que en thread exista un registro con el wa_id del usuario y el bot_id
-        $thread = Thread::where('wa_id', $user->phone)
-            ->where('bot_id', $bot_id)
-            ->first();
-        if (!$thread) {
-            return response()->json(['message' => 'No existe un hilo asociado aun']);
+        try {
+            Log::info($request->all());
+            // Validar que el ID del bot se haya enviado
+            $bot_id = $request->input('id');
+            if (!$bot_id) {
+                return response()->json(['message' => 'El ID del bot es requerido'], 400);
+            }
+            Log::info("Bot ID: $bot_id");
+
+            // Obtener el bot con el ID
+            $bot = Bot::find($bot_id);
+            if (!$bot) {
+                return response()->json(['message' => 'El bot no existe'], 404);
+            }
+            Log::info("Bot encontrado: $bot->nombre");
+
+            // Obtener el usuario autenticado
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json(['message' => 'Usuario no autenticado'], 401);
+            }
+            Log::info("Usuario autenticado: $user->phone");
+
+            // Buscar el hilo asociado al usuario y al bot
+            $thread = Thread::where('wa_id', $user->phone)
+                ->where('bot_id', $bot_id)
+                ->first();
+
+            if (!$thread) {
+                return response()->json(['message' => 'No existe un hilo asociado aún'], 404);
+            }
+
+            // Cambiar dinámicamente las credenciales de OpenAI
+            config(['openai.api_key' => $bot->openai_key]);
+            config(['openai.organization' => $bot->openai_org]);
+
+            // Intentar eliminar el thread en OpenAI
+            try {
+                OpenAI::threads()->delete($thread->thread_id);
+            } catch (\Exception $e) {
+                \Log::error("Error al eliminar el hilo en OpenAI: " . $e->getMessage());
+                return response()->json([
+                    'message' => 'Error al eliminar el hilo en OpenAI.',
+                    'error' => $e->getMessage()
+                ], 500);
+            }
+
+            // Intentar eliminar el thread en la base de datos
+            try {
+                $thread->delete();
+            } catch (\Exception $e) {
+                \Log::error("Error al eliminar el hilo en la base de datos: " . $e->getMessage());
+                return response()->json([
+                    'message' => 'Error al eliminar el hilo en la base de datos.',
+                    'error' => $e->getMessage()
+                ], 500);
+            }
+
+            \Log::info("Hilo eliminado correctamente. Bot ID: $bot_id, Usuario: $user->phone");
+
+            return response()->json(['message' => 'Hilo eliminado con éxito'], 200);
+
+        } catch (\Exception $e) {
+            \Log::error("Error en deleteThread: " . $e->getMessage());
+            return response()->json([
+                'message' => 'Ocurrió un error inesperado al eliminar el hilo.',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        // Cambiar dinámicamente las credenciales de OpenAI
-        config(['openai.api_key' => $bot->openai_key]);
-        config(['openai.organization' => $bot->openai_org]);
-
-        OpenAI::threads()->delete($thread->thread_id);
-        // eliminar de la base de datos
-        $thread->delete();
-        return response()->json(['message' => 'Hilo eliminado con éxito']);
     }
+
 }

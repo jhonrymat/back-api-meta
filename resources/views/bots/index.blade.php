@@ -589,9 +589,9 @@
     <script>
         $(document).ready(function() {
             // Capturar el clic en el botón "Limpiar chat"
-            $('.modal-header').on('click', '.clear-chat', function() {
-                var botId = $(this).data('bot-id');
-
+            $('.modal-header').on('click', '.clear-chat-agente', function() {
+                var agente_Id = $(this).data('agente-id');
+                console.log("1" + agente_Id);
                 Swal.fire({
                     title: '¿Estás seguro?',
                     text: "Esto eliminará todo el hilo de conversación.",
@@ -608,7 +608,7 @@
                             type: 'DELETE',
                             data: {
                                 _token: $('meta[name="csrf-token"]').attr('content'),
-                                id: botId
+                                id: agente_Id
                             },
                             success: function(response) {
                                 Swal.fire(

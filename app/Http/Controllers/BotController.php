@@ -2,8 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Bot;
 use Log;
+use Exception;
+use App\Models\Bot;
 use OpenAI\Factory;
 use App\Models\Aplicaciones;
 use Illuminate\Http\Request;
@@ -19,23 +20,38 @@ class BotController extends Controller
         // Obtener el usuario logueado
         $user = Auth::user();
 
-        if ($user) {
-            // Obtener todas las aplicaciones del usuario con sus bots asociados
-            $aplicaciones = $user->aplicaciones()->with('bot')->get();
-            // Obtener todos los bots (independientemente de si están asociados a una aplicación)
-            $todosLosBots = $user->bots;
-            // obtener todas las aplicaciones
-            $aplicaciones2 = Aplicaciones::all();
-        } else {
+        if (!$user) {
             return redirect('login')->with('error', 'Debe estar logueado para ver las aplicaciones.');
         }
 
-        return view('bots/index', [
-            'aplicaciones' => $aplicaciones,
-            'todosLosBots' => $todosLosBots,
-            'aplicaciones2' => $aplicaciones2,
-        ]);
+        // Obtener todas las aplicaciones del usuario con sus bots asociados
+        $aplicaciones = $user->aplicaciones()->with('bot')->get();
+        // Obtener todos los bots del usuario
+        $todosLosBots = $user->bots;
+        // Obtener todas las aplicaciones
+        $aplicaciones2 = Aplicaciones::all();
+
+        ;
+
+        foreach ($todosLosBots as $bot) {
+            try {
+                // Cambiar dinámicamente las credenciales de OpenAI
+                $openAI = (new Factory())
+                    ->withApiKey($bot->openai_key)
+                    ->withOrganization($bot->openai_org)
+                    ->withHttpHeader('OpenAI-Beta', 'assistants=v2') // Agregar el encabezado necesario
+                    ->make();
+                $assistant = $openAI->assistants()->retrieve($bot->openai_assistant);
+                $bot->model = $assistant->model; // Guardar temporalmente el modelo en el objeto bot
+            } catch (Exception $e) {
+                Log::error("Error al recuperar el modelo del asistente {$bot->id}: " . $e->getMessage());
+                $bot->model = null; // Si falla, asignamos null
+            }
+        }
+
+        return view('bots/index', compact('aplicaciones', 'todosLosBots', 'aplicaciones2'));
     }
+
 
 
     public function store(Request $request)
@@ -219,7 +235,7 @@ class BotController extends Controller
             return response()->json([
                 'error' => $e->getMessage()
             ], 500);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Capturar otros errores generales
             return response()->json([
                 'error' => 'Ocurrió un error al intentar eliminar el bot.'
@@ -352,7 +368,7 @@ class BotController extends Controller
             return response()->json([
                 'success' => 'Bot creado con éxito y asociado a la aplicación.'
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'error' => 'Error al guardar asistente: ' . $e->getMessage()
             ], 500);
