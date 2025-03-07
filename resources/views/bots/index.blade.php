@@ -481,12 +481,17 @@
             function sendMessage(botId) {
                 var userInput = $('#user-input-' + botId).val(); // Selecciona el input correcto
                 var imageInput = $('#image-input-' + botId)[0].files[0]; // Obtener imagen
+                var sendButton = $('#send-btn-' + botId); // Botón de enviar
+                var chatBox = $('#chat-box-' + botId); // Selecciona el chat-box correcto
 
                 if (!userInput.trim() && !imageInput) {
                     return; // No enviar si no hay texto ni imagen
                 }
 
-                var chatBox = $('#chat-box-' + botId); // Selecciona el chat-box correcto
+                // ✅ Deshabilitar el botón de enviar y cambiar el icono a "pensando"
+                sendButton.prop('disabled', true);
+                sendButton.html('<i class="fas fa-spinner fa-spin"></i>');
+
 
                 // Mostrar mensaje del usuario
                 if (userInput.trim()) {
@@ -501,6 +506,8 @@
                                 </div>`);
                     };
                     reader.readAsDataURL(imageInput);
+                    chatBox.scrollTop(chatBox[0]
+                        .scrollHeight); // Desplazarse hacia el último mensaje
                 }
 
                 chatBox.scrollTop(chatBox[0]
@@ -526,8 +533,6 @@
                     processData: false, // Necesario para FormData
                     contentType: false, // Necesario para FormData
                     success: function(response) {
-                        var chatBox = $('#chat-box-' + botId);
-
                         // Usar `marked.parse` para convertir Markdown a HTML
                         var htmlContent = marked.parse(response.answer);
 
@@ -541,6 +546,14 @@
                         chatBox.append(
                             '<div class="chat-message bot-message"><p>Error al obtener respuesta, intenta de nuevo.</p></div>'
                         );
+                    },
+                    complete: function() {
+                        // ✅ Rehabilitar el botón de enviar y restaurar el icono original
+                        sendButton.prop('disabled', false);
+                        sendButton.html('Enviar');
+
+                        // ✅ Limpiar input de imagen
+                        $('#image-input-' + botId).val('');
                     }
                 });
 
