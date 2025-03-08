@@ -248,6 +248,6 @@ Route::get('bots/{botId}/assistant', [BotController::class, 'BotOpenai'])->name(
 Route::post('ask-bot', [BotIA::class, 'askBot']);
 
 Route::post('ask-bot-embedded', [BotIA::class, 'askBotForEmbed'])->middleware('cors.custom')->withoutMiddleware('auth');
-
+Route::post('upload-image', [BotIA::class, 'uploadImage'])->middleware('cors.custom')->withoutMiddleware('auth');
 // borrar hilo deleteThread
 Route::delete('delete-thread', [BotIA::class, 'deleteThread'])->name('deleteThread');

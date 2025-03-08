@@ -428,9 +428,9 @@ class BotIA extends Controller
     {
         try {
             $botId = $request->input('botId');
-            if (!$botId) {
-                return response()->json(['error' => 'El botId es obligatorio.'], 400);
-            }
+            $question = $request->input('question');
+            $imageUrl = $request->input('image_url');  // 🔹 Obtener la imagen si se envió
+            $waId = $request->input('userIdentifier');
 
             // Obtener el bot desde la base de datos
             $bot = Bot::find($botId);
@@ -438,17 +438,6 @@ class BotIA extends Controller
                 return response()->json(['error' => 'El bot no existe.'], 404);
             }
 
-            // Validar que se recibió una pregunta
-            $question = $request->input('question');
-            if (!$question) {
-                return response()->json(['error' => 'La pregunta es obligatoria.'], 400);
-            }
-
-            // Validar que se recibió un identificador de usuario
-            $waId = $request->input('userIdentifier');
-            if (!$waId) {
-                return response()->json(['error' => 'El identificador de usuario es obligatorio.'], 400);
-            }
 
 
             // obtener el bot desde la base de datos
@@ -460,7 +449,7 @@ class BotIA extends Controller
                 $bot->openai_key,
                 $bot->openai_org,
                 $bot->openai_assistant,
-                $imageUrl = null
+                $imageUrl
             );
 
             return response()->json(['answer' => $botResponse]);
@@ -539,6 +528,17 @@ class BotIA extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    public function uploadImage(Request $request)
+    {
+        Log::info('Subiendo imagen...');
+        if ($request->hasFile('image')) {
+            $imagePath = $request->file('image')->store('images', 'public');
+            $imageUrl = asset('storage/' . $imagePath); // 🔹 Se genera correctamente la URL
+            return response()->json(['imageUrl' => $imageUrl]);
+        }
+        return response()->json(['error' => 'No se pudo subir la imagen.'], 400);
     }
 
 }

@@ -80,6 +80,11 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
             <div class="chat-embed-modal-footer">
                 <input type="text" id="user-input" name="user-input" class="chat-embed-input" placeholder="Escribe un mensaje..." />
+                <!-- Botón para subir imágenes -->
+                <label for="image-input" class="chat-embed-send-btn" id="image-preview-container">
+                    <i class="fas fa-image" id="image-icon"></i>
+                    <input type="file" id="image-input" style="display:none" accept="image/*" />
+                </label>
                 <button type="button" class="chat-embed-send-btn" id="send-btn">
                     <i class="fas fa-paper-plane"></i>
                 </button>
@@ -101,66 +106,172 @@ document.addEventListener('DOMContentLoaded', function () {
     // Enviar mensaje del usuario
     var sendButton = document.getElementById('send-btn');
     var userInput = document.getElementById('user-input');
-    if (sendButton) {
-        sendButton.addEventListener('click', function () {
-            if (userInput && userInput.value.trim()) {
-                var chatBox = document.getElementById('chat-box');
-                if (chatBox) {
-                    var userMessageValue = userInput.value.trim();
+    var imageInput = document.getElementById('image-input');
+    var chatBox = document.getElementById('chat-box');
+    var imagePreviewContainer = document.getElementById('image-preview-container');
+    var imageIcon = document.getElementById('image-icon');
 
-                    // Añadir el mensaje del usuario al chat
-                    var userMessage = document.createElement('div');
-                    userMessage.classList.add('chat-embed-message', 'user-message');
-                    userMessage.innerHTML = '<i class="fas fa-user" style="margin-right: 8px;"></i>' + '<p>' + marked.parse(userMessageValue) + '</p>';
-                    chatBox.appendChild(userMessage);
-                    userInput.value = ''; // Limpiar input
+    // Variable para almacenar la URL de la imagen subida
+    var imageUrl = null;
+    var selectedImageFile = null; // 🔹 Guardar la imagen seleccionada sin subirla aún
 
-                    // Enviar mensaje al servidor
-                    // fetch('http://127.0.0.1:8000/admin/ask-bot-embedded', {
-                    fetch('https://maddigo.com.co/admin/ask-bot-embedded', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            question: userMessageValue,
-                            botId: botId,
-                            userIdentifier: userIdentifier
-                        })
-                    })
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.answer) {
-                                var botMessage = document.createElement('div');
-                                botMessage.classList.add('chat-embed-message', 'bot-message');
-                                botMessage.innerHTML = `
-                                    <i class="fas fa-robot" style="margin-right: 8px;"></i>
-                                    <div class="chat-embed-message-content">
-                                        ${marked.parse(data.answer)}
-                                    </div>
-                                `;
-                                chatBox.appendChild(botMessage);
-                                chatBox.scrollTop = chatBox.scrollHeight;
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Error al enviar la solicitud:', error);
-                        });
-                } else {
-                    console.error('No se pudo encontrar el chat box en el DOM.');
+    // Función para manejar la previsualización de la imagen
+    imageInput.addEventListener('change', function () {
+        var file = this.files[0];
+        if (file) {
+            selectedImageFile = file; // 🔹 Guardar la imagen sin subirla
+
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                // 🔹 Reemplazar el icono con la imagen seleccionada
+                imagePreviewContainer.style.backgroundImage = `url(${e.target.result})`;
+                imagePreviewContainer.style.backgroundSize = "cover";
+                imagePreviewContainer.style.backgroundPosition = "center";
+                imagePreviewContainer.style.borderRadius = "50%";
+                imagePreviewContainer.style.width = "40px";
+                imagePreviewContainer.style.height = "40px";
+                imageIcon.style.display = "none"; // 🔹 Ocultar el icono de la imagen
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    sendButton.addEventListener('click', function () {
+        var userMessageValue = userInput.value.trim();
+
+        // Si no hay texto ni imagen seleccionada, no hacemos nada
+        if (!userMessageValue && !selectedImageFile) {
+            console.error('No hay mensaje ni imagen para enviar.');
+            return;
+        }
+
+        // 🔹 Deshabilitar el botón de enviar mientras se procesa la solicitud
+        sendButton.disabled = true;
+        userInput.disabled = true;
+        imageInput.disabled = true;
+        sendButton.innerHTML = `<i class="fas fa-spinner fa-spin"></i>`; // 🔄 Mostrar animación de carga
+
+        // **Mostrar la imagen en el botón mientras se sube**
+        if (selectedImageFile) {
+            imagePreviewContainer.style.backgroundImage = ""; // Limpiar imagen anterior
+            imageIcon.style.display = "none"; // Ocultar icono de imagen
+            imagePreviewContainer.innerHTML = `<i class="fas fa-spinner fa-spin"></i>`; // 🔄 Mostrar carga
+        }
+
+        // **Si hay imagen, subirla primero antes de enviar el mensaje**
+        if (selectedImageFile) {
+            var formData = new FormData();
+            formData.append('image', selectedImageFile);
+
+            // fetch('http://127.0.0.1:8000/admin/upload-image', {
+            fetch('https://maddigo.com.co/admin/upload-image', {
+                method: 'POST',
+                body: formData,
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.imageUrl) {
+                        imageUrl = data.imageUrl;
+
+                        // **📌 Reemplazar el icono de carga con la imagen real en el botón**
+                        imagePreviewContainer.style.backgroundImage = `url(${imageUrl})`;
+                        imagePreviewContainer.innerHTML = ""; // Limpiar icono de carga
+
+                        console.log("Imagen subida correctamente: ", imageUrl);
+                    }
+                })
+                .catch(error => console.error('Error al subir la imagen:', error))
+                .finally(() => {
+                    // **Después de subir la imagen, permitir el envío del mensaje**
+                    enviarMensaje(userMessageValue, imageUrl);
+                });
+        } else {
+            // Si no hay imagen, enviar solo el texto
+            enviarMensaje(userMessageValue, null);
+        }
+    });
+
+    // 🔹 Función para enviar el mensaje al backend
+    function enviarMensaje(userMessageValue, imageUrl) {
+        // 🔹 Deshabilitar inputs mientras se procesa la IA
+        sendButton.disabled = true;
+        userInput.disabled = true;
+        imageInput.disabled = true;
+        sendButton.innerHTML = `<i class="fas fa-spinner fa-spin"></i>`; // 🔄 Animación de carga
+
+        // **Agregar el mensaje de texto al chat de inmediato**
+        if (userMessageValue) {
+            var userTextMessage = document.createElement('div');
+            userTextMessage.classList.add('chat-embed-message', 'user-message');
+            userTextMessage.innerHTML = `<p>${userMessageValue}</p>`;
+            chatBox.appendChild(userTextMessage);
+        }
+
+        // **Si hay imagen, agregarla al chat de inmediato**
+        if (imageUrl) {
+            var imageMessage = document.createElement('div');
+            imageMessage.classList.add('chat-embed-message', 'user-message');
+            imageMessage.innerHTML = `<img src="${imageUrl}" class="chat-embed-image-preview" style="max-width: 200px; border-radius: 5px;" />`;
+            chatBox.appendChild(imageMessage);
+        }
+
+        chatBox.scrollTop = chatBox.scrollHeight; // 🔹 Hacer scroll al final
+
+        // 🔹 Enviar mensaje a la IA
+        // fetch('http://127.0.0.1:8000/admin/ask-bot-embedded', {
+        fetch('https://maddigo.com.co/admin/ask-bot-embedded', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                question: userMessageValue,
+                image_url: imageUrl, // 🔹 Enviar la imagen si se subió
+                botId: botId,
+                userIdentifier: userIdentifier
+            })
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.answer) {
+                    var botMessage = document.createElement('div');
+                    botMessage.classList.add('chat-embed-message', 'bot-message');
+                    botMessage.innerHTML = `<i class="fas fa-robot" style="margin-right: 8px;"></i>
+                    <div class="chat-embed-message-content">${marked.parse(data.answer)}</div>`;
+                    chatBox.appendChild(botMessage);
+                    chatBox.scrollTop = chatBox.scrollHeight;
                 }
-            } else {
-                console.error('Input de usuario no encontrado o está vacío.');
-            }
-        });
+            })
+            .catch(error => console.error('Error al enviar la solicitud:', error))
+            .finally(() => {
+                // **Habilitar los inputs después de que la IA responda**
+                sendButton.disabled = false;
+                userInput.disabled = false;
+                imageInput.disabled = false;
+                sendButton.innerHTML = `<i class="fas fa-paper-plane"></i>`; // 🔹 Restaurar icono de enviar
 
-        // Agregar el evento keypress para el envío con Enter
+                // **Limpiar la vista previa de la imagen después de enviarla**
+                imagePreviewContainer.style.backgroundImage = "";
+                imageIcon.style.display = "block";
+                selectedImageFile = null; // 🔹 Resetear imagen seleccionada
+            });
+    }
+});
+
+
+document.addEventListener('DOMContentLoaded', function () {
+    var sendButton = document.getElementById('send-btn');
+    var userInput = document.getElementById('user-input');
+
+    if (userInput && sendButton) {
         userInput.addEventListener('keypress', function (e) {
             if (e.key === 'Enter') {
-                sendButton.click();
+                e.preventDefault(); // 🔹 Evita el comportamiento por defecto
+                sendButton.click(); // 🔹 Simula un clic en el botón de enviar
             }
         });
     } else {
-        console.error('No se pudo encontrar el botón de envío en el DOM.');
+        console.error('Elementos no encontrados: userInput o sendButton');
     }
 });
+

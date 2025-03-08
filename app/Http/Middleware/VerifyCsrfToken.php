@@ -17,7 +17,9 @@ class VerifyCsrfToken extends Middleware
         '/refresh-csrf',
         '/check-session',
         '/ask-bot-embedded',
+        '/upload-image',
         '/admin/ask-bot-embedded',
+        '/admin/upload-image',
         '/livewire/*',
         '/contact',
         '/livewire/update', // Excluir actualización de Livewire
