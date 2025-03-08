@@ -249,11 +249,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 userInput.disabled = false;
                 imageInput.disabled = false;
                 sendButton.innerHTML = `<i class="fas fa-paper-plane"></i>`; // 🔹 Restaurar icono de enviar
+                imageInput.innerHTML = `<i class="fas fa-image"></i>`; // 🔹 Restaurar icono de imagen
 
                 // **Limpiar la vista previa de la imagen después de enviarla**
                 imagePreviewContainer.style.backgroundImage = "";
                 imageIcon.style.display = "block";
                 selectedImageFile = null; // 🔹 Resetear imagen seleccionada
+                // Limpiar el valor del input text
+                userInput.value = "";
             });
     }
 });

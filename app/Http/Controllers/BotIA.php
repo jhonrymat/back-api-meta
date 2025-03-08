@@ -112,9 +112,11 @@ class BotIA extends Controller
             // 🔹 **Crear el contenido a enviar**
             $content = [];
             if (!empty($question)) {
+                Log::info('Se agregó la pregunta al contenido.');
                 $content[] = ['type' => 'text', 'text' => $question];
             }
             if (!empty($imageUrl)) {
+                Log::info('Se agregó la imagen al contenido.');
                 $content[] = ['type' => 'image_url', 'image_url' => ['url' => $imageUrl]];
             }
 
@@ -230,7 +232,9 @@ class BotIA extends Controller
 
     public function ask($question, $waId, $botId, $openai_key, $openai_org, $openai_assistant, $imageUrl)
     {
+        Log::info('Pregunta: ' . $question . ', Imagen: ' . $imageUrl . ', Bot ID: ' . $botId . ', Usuario: ' . $waId);
         $this->question = $question;
+        Log::info('Pregunta: ' . $question . ', Imagen: ' . $imageUrl . ', Bot ID: ' . $botId . ', Usuario: ' . $waId);
 
         // Obtener el bot y verificar si tiene un webhook habilitado
         $bot = Bot::find($botId);
@@ -276,9 +280,11 @@ class BotIA extends Controller
         } else {
             Log::info('configurado local para este bot.');
             // 🔹 Si hay imagen y texto, procesar ambos
-            if ($imageUrl) {
+            if (!empty($imageUrl)) {
+                Log::info('Procesando imagen y texto...');
                 return $this->processImageAndText($imageUrl, $question, $botId, $bot->openai_key, $bot->openai_org, $bot->openai_assistant, $waId, $thread->thread_id);
             } elseif (!empty($question)) {
+                Log::info('Procesando solo texto...');
                 // 🔹 Si NO hay un webhook, usar OpenAI directamente
                 return $this->loadAnswer($threadRun, $openai_key, $openai_org, $openai_assistant, $botId);
             } else {
@@ -460,16 +466,23 @@ class BotIA extends Controller
                 return response()->json(['error' => 'Debe enviar una pregunta o una imagen.'], 400);
             }
 
+            Log::info(
+                'Pregunta: ' . $question
+                . ', Imagen: ' . $imageUrl
+                . ', Bot ID: ' . $botId
+                . ', Usuario: ' . $waId
+            );
+
             // obtener el bot desde la base de datos
             // Llamar a la función ask para obtener la respuesta del bot
             $botResponse = $this->ask(
-                $question ?: null,  // 🔹 Si `question` está vacío, enviar `null`
+                $question,
                 $waId,
                 $botId,
                 $bot->openai_key,
                 $bot->openai_org,
                 $bot->openai_assistant,
-                $imageUrl ?: null  // 🔹 Si `image_url` está vacío, enviar `null`
+                $imageUrl
             );
 
             return response()->json(['answer' => $botResponse]);
