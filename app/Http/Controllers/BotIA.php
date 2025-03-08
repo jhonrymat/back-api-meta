@@ -438,18 +438,21 @@ class BotIA extends Controller
                 return response()->json(['error' => 'El bot no existe.'], 404);
             }
 
-
+            // **🚀 Validar si al menos hay imagen o texto**
+            if (empty($question) && empty($imageUrl)) {
+                return response()->json(['error' => 'Debe enviar una pregunta o una imagen.'], 400);
+            }
 
             // obtener el bot desde la base de datos
             // Llamar a la función ask para obtener la respuesta del bot
             $botResponse = $this->ask(
-                $question,
+                $question ?: null,  // 🔹 Si `question` está vacío, enviar `null`
                 $waId,
                 $botId,
                 $bot->openai_key,
                 $bot->openai_org,
                 $bot->openai_assistant,
-                $imageUrl
+                $imageUrl ?: null  // 🔹 Si `image_url` está vacío, enviar `null`
             );
 
             return response()->json(['answer' => $botResponse]);
