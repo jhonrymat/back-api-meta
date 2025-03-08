@@ -86,29 +86,45 @@ class BotIA extends Controller
                 ->withHttpHeader('OpenAI-Beta', 'assistants=v2')
                 ->make();
 
+            // Verificar que al menos haya texto o imagen
+            if (empty($question) && empty($imageUrl)) {
+                Log::error('Error: No se proporcionó ni texto ni imagen.');
+                return 'Error: Debes enviar una pregunta o una imagen.';
+            }
+
             // Verificar que la URL sea accesible
-            if (!filter_var($imageUrl, FILTER_VALIDATE_URL)) {
+            if ($imageUrl && !filter_var($imageUrl, FILTER_VALIDATE_URL)) {
                 Log::error('URL inválida generada para la imagen: ' . $imageUrl);
                 return 'Error: No se pudo generar una URL válida para la imagen.';
             }
+
             $bot = Bot::find($botId);
+
             // Verificar si la imagen es accesible
-            $imageHeaders = @get_headers($imageUrl);
-            if (!$imageHeaders || strpos($imageHeaders[0], '200') === false) {
-                Log::error('OpenAI no puede acceder a la imagen: ' . $imageUrl);
-                return 'Error: OpenAI no puede acceder a la imagen.';
+            if ($imageUrl) {
+                $imageHeaders = @get_headers($imageUrl);
+                if (!$imageHeaders || strpos($imageHeaders[0], '200') === false) {
+                    Log::error('OpenAI no puede acceder a la imagen: ' . $imageUrl);
+                    return 'Error: OpenAI no puede acceder a la imagen.';
+                }
+            }
+
+            // 🔹 **Crear el contenido a enviar**
+            $content = [];
+            if (!empty($question)) {
+                $content[] = ['type' => 'text', 'text' => $question];
+            }
+            if (!empty($imageUrl)) {
+                $content[] = ['type' => 'image_url', 'image_url' => ['url' => $imageUrl]];
             }
 
 
-            // Enviar mensaje con imagen y texto al asistente
+            // Enviar mensaje con imagen y/o texto al asistente
             $messageResponse = $openAI->threads()->messages()->create(
                 threadId: $threadId,
                 parameters: [
                     'role' => 'user',
-                    'content' => [
-                        ['type' => 'text', 'text' => $question ?: 'Describe esta imagen.'],
-                        ['type' => 'image_url', 'image_url' => ['url' => $imageUrl]],
-                    ],
+                    'content' => $content, // **✅ Ahora `content` nunca es `null`**
                 ]
             );
 
@@ -258,9 +274,10 @@ class BotIA extends Controller
                 $this->answer = 'Hubo un problema al procesar tu mensaje.';
             }
         } else {
+            Log::info('configurado local para este bot.');
             // 🔹 Si hay imagen y texto, procesar ambos
             if ($imageUrl) {
-                $botResponse = $this->processImageAndText($imageUrl, $question, $botId, $bot->openai_key, $bot->openai_org, $bot->openai_assistant, $waId, $thread->thread_id);
+                return $this->processImageAndText($imageUrl, $question, $botId, $bot->openai_key, $bot->openai_org, $bot->openai_assistant, $waId, $thread->thread_id);
             } elseif (!empty($question)) {
                 // 🔹 Si NO hay un webhook, usar OpenAI directamente
                 return $this->loadAnswer($threadRun, $openai_key, $openai_org, $openai_assistant, $botId);
