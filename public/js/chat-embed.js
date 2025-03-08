@@ -193,6 +193,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // 🔹 Función para enviar el mensaje al backend
     function enviarMensaje(userMessageValue, imageUrl) {
+        // ✅ Si el usuario solo envió una imagen, agregar un mensaje por defecto
+        if (!userMessageValue && imageUrl) {
+            userMessageValue = "Describe esta imagen en referencia, a lo que estas entrenado.";
+        }
         // 🔹 Deshabilitar inputs mientras se procesa la IA
         sendButton.disabled = true;
         userInput.disabled = true;
@@ -247,8 +251,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 // **Habilitar los inputs después de que la IA responda**
                 sendButton.disabled = false;
                 userInput.disabled = false;
-                imageInput.disabled = false;
                 sendButton.innerHTML = `<i class="fas fa-paper-plane"></i>`; // 🔹 Restaurar icono de enviar
+
+                // 🔹 Crear un nuevo input de archivo y reemplazar el anterior
+                var newImageInput = document.createElement("input");
+                newImageInput.type = "file";
+                newImageInput.id = "image-input";
+                newImageInput.style.display = "none";
+                newImageInput.accept = "image/*";
+
+                // Reemplazar el input en el DOM
+                var oldImageInput = document.getElementById("image-input");
+                oldImageInput.parentNode.replaceChild(newImageInput, oldImageInput);
 
 
                 // **Restaurar la vista previa del icono de la imagen**
@@ -256,9 +270,28 @@ document.addEventListener('DOMContentLoaded', function () {
                 imagePreviewContainer.innerHTML = `<i class="fas fa-image" id="image-icon"></i>`; // 🔹 Restaurar icono de imagen
                 imageIcon = document.getElementById('image-icon'); // Reasignar la referencia
 
-                // **Resetear input file para permitir seleccionar una nueva imagen**
-                imageInput.value = ""; // Esto permite volver a seleccionar la misma imagen
-                selectedImageFile = null; // 🔹 Resetear variable de imagen seleccionada
+                // **Resetear la variable de imagen seleccionada**
+                selectedImageFile = null;
+
+                // **Volver a agregar el event listener al nuevo input**
+                newImageInput.addEventListener("change", function () {
+                    var file = this.files[0];
+                    if (file) {
+                        selectedImageFile = file;
+
+                        var reader = new FileReader();
+                        reader.onload = function (e) {
+                            imagePreviewContainer.style.backgroundImage = `url(${e.target.result})`;
+                            imagePreviewContainer.style.backgroundSize = "cover";
+                            imagePreviewContainer.style.backgroundPosition = "center";
+                            imagePreviewContainer.style.borderRadius = "50%";
+                            imagePreviewContainer.style.width = "40px";
+                            imagePreviewContainer.style.height = "40px";
+                            imageIcon.style.display = "none";
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                });
 
                 // Limpiar el input de texto
                 userInput.value = "";
