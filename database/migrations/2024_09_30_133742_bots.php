@@ -22,6 +22,7 @@ return new class extends Migration
             $table->string('openai_org');
             $table->string('openai_assistant');
             $table->string('webhook_url')->nullable();
+            $table->boolean('permitir_imagenes')->default(true);
             $table->timestamps();
 
             // Clave foránea para relacionar con la tabla users

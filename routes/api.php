@@ -1,12 +1,14 @@
 <?php
 
+use App\Models\Bot;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\BotController;
 use Illuminate\Support\Facades\Artisan;
 use App\Http\Controllers\ClocalController;
+
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\NumerosController;
-
 use App\Http\Controllers\ContactoController;
 use App\Http\Controllers\AplicacionesController;
 
@@ -28,6 +30,8 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 // Pusher
 Route::post('/store-data', [ClocalController::class, 'storeData']);
 
+
+Route::get('/permitir-imagenes/{botId}', [BotController::class, 'permitirImagenes']);
 // Route::get('/whatsapp-webhook', [MessageController::class, 'verifyWebhook']);
 // Route::post('/whatsapp-webhook', [MessageController::class, 'processWebhook']);
 // Route::apiResources([

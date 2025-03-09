@@ -3,8 +3,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var link = document.createElement('link');
     link.rel = 'stylesheet';
     // local
-    // link.href = 'http://127.0.0.1:8000/css/chat-embed.css';
-    link.href = 'https://maddigo.com.co/css/chat-embed.css'; // producción
+    link.href = 'http://127.0.0.1:8000/css/chat-embed.css';
+    // link.href = 'https://maddigo.com.co/css/chat-embed.css'; // producción
     document.head.appendChild(link);
 
     var faLink = document.createElement('link');
@@ -151,13 +151,6 @@ document.addEventListener('DOMContentLoaded', function () {
         imageInput.disabled = true;
         sendButton.innerHTML = `<i class="fas fa-spinner fa-spin"></i>`; // 🔄 Mostrar animación de carga
 
-        // **Mostrar la imagen en el botón mientras se sube**
-        if (selectedImageFile) {
-            imagePreviewContainer.style.backgroundImage = ""; // Limpiar imagen anterior
-            imageIcon.style.display = "none"; // Ocultar icono de imagen
-            imagePreviewContainer.innerHTML = `<i class="fas fa-spinner fa-spin"></i>`; // 🔄 Mostrar carga
-        }
-
         // **Si hay imagen, subirla primero antes de enviar el mensaje**
         if (selectedImageFile) {
             var formData = new FormData();
@@ -195,7 +188,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function enviarMensaje(userMessageValue, imageUrl) {
         // ✅ Si el usuario solo envió una imagen, agregar un mensaje por defecto
         if (!userMessageValue && imageUrl) {
-            userMessageValue = "Describe esta imagen en referencia, a lo que estas entrenado.";
+            userMessageValue = "Describe esta imagen.";
         }
         // 🔹 Deshabilitar inputs mientras se procesa la IA
         sendButton.disabled = true;
@@ -222,8 +215,8 @@ document.addEventListener('DOMContentLoaded', function () {
         chatBox.scrollTop = chatBox.scrollHeight; // 🔹 Hacer scroll al final
 
         // 🔹 Enviar mensaje a la IA
-        // fetch('http://127.0.0.1:8000/admin/ask-bot-embedded', {
-        fetch('https://maddigo.com.co/admin/ask-bot-embedded', {
+        fetch('http://127.0.0.1:8000/admin/ask-bot-embedded', {
+            // fetch('https://maddigo.com.co/admin/ask-bot-embedded', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -251,52 +244,59 @@ document.addEventListener('DOMContentLoaded', function () {
                 // **Habilitar los inputs después de que la IA responda**
                 sendButton.disabled = false;
                 userInput.disabled = false;
+                imageInput.disabled = false;
                 sendButton.innerHTML = `<i class="fas fa-paper-plane"></i>`; // 🔹 Restaurar icono de enviar
 
-                // 🔹 Crear un nuevo input de archivo y reemplazar el anterior
-                var newImageInput = document.createElement("input");
-                newImageInput.type = "file";
-                newImageInput.id = "image-input";
-                newImageInput.style.display = "none";
-                newImageInput.accept = "image/*";
-
-                // Reemplazar el input en el DOM
-                var oldImageInput = document.getElementById("image-input");
-                oldImageInput.parentNode.replaceChild(newImageInput, oldImageInput);
+                userInput.value = ""; // 🔹 Limpiar el input de texto
 
 
-                // **Restaurar la vista previa del icono de la imagen**
-                imagePreviewContainer.style.backgroundImage = "";
-                imagePreviewContainer.innerHTML = `<i class="fas fa-image" id="image-icon"></i>`; // 🔹 Restaurar icono de imagen
-                imageIcon = document.getElementById('image-icon'); // Reasignar la referencia
-
-                // **Resetear la variable de imagen seleccionada**
-                selectedImageFile = null;
-
-                // **Volver a agregar el event listener al nuevo input**
-                newImageInput.addEventListener("change", function () {
-                    var file = this.files[0];
-                    if (file) {
-                        selectedImageFile = file;
-
-                        var reader = new FileReader();
-                        reader.onload = function (e) {
-                            imagePreviewContainer.style.backgroundImage = `url(${e.target.result})`;
-                            imagePreviewContainer.style.backgroundSize = "cover";
-                            imagePreviewContainer.style.backgroundPosition = "center";
-                            imagePreviewContainer.style.borderRadius = "50%";
-                            imagePreviewContainer.style.width = "40px";
-                            imagePreviewContainer.style.height = "40px";
-                            imageIcon.style.display = "none";
-                        };
-                        reader.readAsDataURL(file);
-                    }
-                });
-
-                // Limpiar el input de texto
-                userInput.value = "";
+                // Restaurar input de imagen correctamente
+                resetImageInput();
             });
     }
+
+    function resetImageInput() {
+        // Restaurar la apariencia original del botón de imagen
+        imagePreviewContainer.style.backgroundImage = "";
+        imagePreviewContainer.innerHTML = '<i class="fas fa-image" id="image-icon"></i>';
+
+        // Verificar si el input de imagen aún existe dentro del contenedor, si no, volver a agregarlo
+        var oldInput = document.getElementById("image-input");
+        if (oldInput) {
+            oldInput.value = ""; // 🔥 Esto limpia la imagen seleccionada
+        } else {
+            var newInput = document.createElement("input");
+            newInput.type = "file";
+            newInput.id = "image-input";
+            newInput.style.display = "none";
+            newInput.accept = "image/*";
+
+            // Volver a agregar el evento change al nuevo input
+            newInput.addEventListener("change", function () {
+                var file = this.files[0];
+                if (file) {
+                    selectedImageFile = file;
+                    var reader = new FileReader();
+                    reader.onload = function (e) {
+                        imagePreviewContainer.style.backgroundImage = `url(${e.target.result})`;
+                        imagePreviewContainer.style.backgroundSize = "cover";
+                        imagePreviewContainer.style.backgroundPosition = "center";
+                        imagePreviewContainer.style.borderRadius = "50%";
+                        imagePreviewContainer.style.width = "40px";
+                        imagePreviewContainer.style.height = "40px";
+                        imageIcon.style.display = "none"; // Ocultar el icono
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            imagePreviewContainer.appendChild(newInput);
+        }
+
+        // 🔥 Asegurar que la variable selectedImageFile también se vacíe
+        selectedImageFile = null;
+    }
+
 });
 
 
@@ -315,4 +315,3 @@ document.addEventListener('DOMContentLoaded', function () {
         console.error('Elementos no encontrados: userInput o sendButton');
     }
 });
-

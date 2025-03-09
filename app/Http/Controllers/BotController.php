@@ -419,4 +419,16 @@ class BotController extends Controller
 
         return response()->json(['message' => 'Webhook guardado correctamente']);
     }
+
+    public function permitirImagenes($botId)
+    {
+        $bot = Bot::find($botId);
+
+        if (!$bot) {
+            return response()->json(['error' => 'Bot no encontrado'], 404);
+        }
+
+        return response()->json(['permitirImagenes' => (bool) $bot->permitir_imagenes]);
+
+    }
 }
