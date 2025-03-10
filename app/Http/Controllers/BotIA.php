@@ -244,9 +244,6 @@ class BotIA extends Controller
                 'thread_id' => $threadRun->threadId,
                 'bot_id' => $botId,
             ]);
-        } elseif (empty($imageUrl)) {
-            // Si existe un hilo, usar el hilo existente
-            $threadRun = $this->continueThread($thread->thread_id, $openai_key, $openai_org, $openai_assistant);
         }
 
         if ($webhookUrl) {
@@ -279,6 +276,7 @@ class BotIA extends Controller
             return $this->processImageAndText($imageUrl, $question, $botId, $bot->openai_key, $bot->openai_org, $bot->openai_assistant, $waId, $thread->thread_id);
         } elseif (!empty($question)) {
             Log::info('Procesando solo texto...');
+            $threadRun = $this->continueThread($thread->thread_id, $openai_key, $openai_org, $openai_assistant);
             // 🔹 Si NO hay un webhook, usar OpenAI directamente
             return $this->loadAnswer($threadRun, $openai_key, $openai_org, $openai_assistant, $botId);
         } else {
