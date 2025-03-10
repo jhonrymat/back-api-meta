@@ -482,7 +482,8 @@
 
             function sendMessage(botId) {
                 var userInput = $('#user-input-' + botId).val(); // Selecciona el input correcto
-                var imageInput = $('#image-input-' + botId)[0].files[0]; // Obtener imagen
+                var imageInputElement = $('#image-input-' + botId)[0];
+                var imageInput = imageInputElement ? imageInputElement.files[0] : null;
                 var sendButton = $('#send-btn-' + botId); // Botón de enviar
                 var chatBox = $('#chat-box-' + botId); // Selecciona el chat-box correcto
 
@@ -552,7 +553,7 @@
                     complete: function() {
                         // ✅ Rehabilitar el botón de enviar y restaurar el icono original
                         sendButton.prop('disabled', false);
-                        sendButton.html('Enviar');
+                        sendButton.html('<i class="fas fa-paper-plane"></i>');
 
                         // ✅ Limpiar input de imagen
                         $('#image-input-' + botId).val('');
@@ -753,7 +754,8 @@
             document.addEventListener("click", function(event) {
                 if (event.target.classList.contains("saveWebhook")) {
                     let botId = event.target.getAttribute("data-botid");
-                    let webhookUrl = document.getElementById(`webhook_url_${botId}`).value.trim(); // 🔹 Eliminar espacios extra
+                    let webhookUrl = document.getElementById(`webhook_url_${botId}`).value
+                .trim(); // 🔹 Eliminar espacios extra
 
                     // **Permitir valores vacíos (nulos)**
                     if (webhookUrl === "") {
@@ -770,7 +772,8 @@
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')
+                                    .getAttribute('content')
                             },
                             body: JSON.stringify({
                                 webhook_url: webhookUrl, // ✅ Puede ser NULL o una URL válida
