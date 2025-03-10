@@ -440,7 +440,7 @@ class BotController extends Controller
     public function guardarWebhook(Request $request)
     {
         $request->validate([
-            'webhook_url' => 'required|url'
+            'webhook_url' => 'null|url'
         ]);
 
         $bot = Bot::findOrFail($request->bot_id);
