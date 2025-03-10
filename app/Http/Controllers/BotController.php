@@ -439,20 +439,24 @@ class BotController extends Controller
 
     public function guardarWebhook(Request $request)
     {
+        // 🔹 Validar que la URL sea nula o una URL válida
         $request->validate([
-            'webhook_url' => 'null|url'
+            'webhook_url' => 'nullable|url'
         ]);
 
+        // 🔹 Buscar el bot
         $bot = Bot::findOrFail($request->bot_id);
 
-        if (!$bot) {
-            return response()->json(['message' => 'Bot no encontrado'], 404);
-        }
+        // 🔹 Actualizar el webhook (puede ser NULL o una URL válida)
+        $bot->update([
+            'webhook_url' => $request->webhook_url
+        ]);
 
-        $bot->update(['webhook_url' => $request->webhook_url]);
-
-        return response()->json(['message' => 'Webhook guardado correctamente']);
+        return response()->json([
+            'message' => 'Webhook guardado correctamente'
+        ]);
     }
+
 
     public function permitirImagenes($botId)
     {
