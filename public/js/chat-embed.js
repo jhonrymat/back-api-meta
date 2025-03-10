@@ -3,8 +3,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var link = document.createElement('link');
     link.rel = 'stylesheet';
     // local
-    link.href = 'http://127.0.0.1:8000/css/chat-embed.css';
-    // link.href = 'https://maddigo.com.co/css/chat-embed.css'; // producción
+    // link.href = 'http://127.0.0.1:8000/css/chat-embed.css';
+    link.href = 'https://maddigo.com.co/css/chat-embed.css'; // producción
     document.head.appendChild(link);
 
     var faLink = document.createElement('link');
@@ -219,8 +219,8 @@ document.addEventListener('DOMContentLoaded', function () {
         chatBox.scrollTop = chatBox.scrollHeight; // 🔹 Hacer scroll al final
 
         // 🔹 Enviar mensaje a la IA
-        fetch('http://127.0.0.1:8000/admin/ask-bot-embedded', {
-            // fetch('https://maddigo.com.co/admin/ask-bot-embedded', {
+        // fetch('http://127.0.0.1:8000/admin/ask-bot-embedded', {
+        fetch('https://maddigo.com.co/admin/ask-bot-embedded', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -321,8 +321,8 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 function obtenerEstadoImagenes(botId) {
-    fetch(`http://127.0.0.1:8000/api/permitir-imagenes/${botId}`)
-        // fetch(`https://maddigo.com.co/api/permitir-imagenes/${botId}`)
+    // fetch(`http://127.0.0.1:8000/api/permitir-imagenes/${botId}`)
+    fetch(`https://maddigo.com.co/api/permitir-imagenes/${botId}`)
         .then(response => response.json())
         .then(data => {
             var imagePreviewContainer = document.getElementById('image-preview-container'); // Asegurar que el elemento existe
