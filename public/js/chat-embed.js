@@ -17,6 +17,8 @@ document.addEventListener('DOMContentLoaded', function () {
     script.src = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
     document.head.appendChild(script);
 
+
+
     // Función para generar un UUID
     function generateUUID() {
         return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c =>
@@ -110,6 +112,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var chatBox = document.getElementById('chat-box');
     var imagePreviewContainer = document.getElementById('image-preview-container');
     var imageIcon = document.getElementById('image-icon');
+
+    obtenerEstadoImagenes(botId); // Consultar si el bot permite imágenes después de definir los elementos
 
     // Variable para almacenar la URL de la imagen subida
     var imageUrl = null;
@@ -315,3 +319,24 @@ document.addEventListener('DOMContentLoaded', function () {
         console.error('Elementos no encontrados: userInput o sendButton');
     }
 });
+
+function obtenerEstadoImagenes(botId) {
+    fetch(`http://127.0.0.1:8000/api/permitir-imagenes/${botId}`)
+        // fetch(`https://maddigo.com.co/api/permitir-imagenes/${botId}`)
+        .then(response => response.json())
+        .then(data => {
+            var imagePreviewContainer = document.getElementById('image-preview-container'); // Asegurar que el elemento existe
+            if (!imagePreviewContainer) {
+                console.error("El elemento imagePreviewContainer no se encontró en el DOM.");
+                return;
+            }
+
+            if (data.permitirImagenes) {
+                imagePreviewContainer.style.display = "inline-block"; // Mostrar el botón
+            } else {
+                imagePreviewContainer.style.display = "none"; // Ocultar el botón
+            }
+        })
+        .catch(error => console.error("Error obteniendo el estado de imágenes:", error));
+}
+

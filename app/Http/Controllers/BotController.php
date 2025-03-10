@@ -120,7 +120,8 @@ class BotController extends Controller
                 'openai_key' => $bot->openai_key,
                 'openai_org' => $bot->openai_org,
                 'openai_assistant' => $bot->openai_assistant,
-                'aplicacion_id' => $aplicacion_id // Incluir aplicacion_id en la respuesta
+                'aplicacion_id' => $aplicacion_id, // Incluir aplicacion_id en la respuesta
+                'permitir_imagenes' => $bot->permitir_imagenes
             ]
         ]);
 
@@ -128,16 +129,33 @@ class BotController extends Controller
 
     public function update(Request $request, $id)
     {
+        // Modelos que admiten imágenes
+        $modosQueAdmitenImagenes = [
+            "gpt-4.5-preview",
+            "gpt-4o",
+            "gpt-4o-mini",
+            "gpt-4-turbo",
+            "o1"
+        ];
+
         $request->validate([
             'nombre' => 'required',
             'descripcion' => 'required',
             'openai_key' => 'required',
             'openai_org' => 'required',
             'openai_assistant' => 'required',
-            'aplicacion_id' => 'nullable|exists:aplicaciones,id' // Cambiado a nullable
+            'aplicacion_id' => 'nullable|exists:aplicaciones,id', // Cambiado a nullable
+            'allow_images' => 'nullable|boolean',
         ]);
 
         $bot = Bot::findOrFail($id);
+
+        // Validar si el modelo seleccionado admite imágenes
+        if ($request->allow_images && !in_array($request->model, $modosQueAdmitenImagenes)) {
+            return response()->json([
+                'error' => 'El modelo seleccionado no admite imágenes. Modelos que sí las admiten: ' . implode(", ", $modosQueAdmitenImagenes)
+            ], 400);
+        }
 
         // Actualizar los datos del bot
         $bot->update([
@@ -146,6 +164,7 @@ class BotController extends Controller
             'openai_key' => $request->openai_key,
             'openai_org' => $request->openai_org,
             'openai_assistant' => $request->openai_assistant,
+            'permitir_imagenes' => $request->allow_images ? 1 : 0, // Guardar como 1 o 0
         ]);
 
         // Si `aplicacion_id` está presente, manejamos la asociación
@@ -249,9 +268,15 @@ class BotController extends Controller
     // moetodo para crear bot con asistente openai
     public function createBot(Request $request)
     {
-
-
         try {
+
+            $modosQueAdmitenImagenes = [
+                "gpt-4.5-preview",
+                "gpt-4o",
+                "gpt-4o-mini",
+                "gpt-4-turbo",
+                "o1"
+            ];
 
             $uploadedFile = null;
             $fileIds = []; // Inicializamos la lista de IDs de los archivos subidos
@@ -264,11 +289,19 @@ class BotController extends Controller
                 'openai_key' => 'required',
                 'openai_org' => 'required',
                 'instrucciones' => 'required',
-                'modelo' => 'required',
+                'model' => 'required',
                 'temperature' => 'required|numeric',
                 'top_p' => 'required|numeric',
                 'aplicacion_id' => 'nullable|exists:aplicaciones,id',
+                'allow_images' => 'boolean',
             ]);
+
+            // Validar si el usuario intenta activar imágenes en un modelo que no lo permite
+            if ($request->allow_images && !in_array($request->model, $modosQueAdmitenImagenes)) {
+                return response()->json([
+                    'error' => 'El modelo seleccionado no admite imágenes. Modelos que sí las admiten: ' . implode(", ", $modosQueAdmitenImagenes)
+                ], 400);
+            }
 
             $nombreCarpeta = $request->nombre;
 
@@ -321,7 +354,7 @@ class BotController extends Controller
                         ],
                     ],
                     'instructions' => $request->instrucciones,
-                    'model' => $request->modelo,
+                    'model' => $request->model,
                     'temperature' => floatval($request->temperature), // Convertir a decimal
                     'top_p' => floatval($request->top_p), // Convertir a decimal
 
@@ -332,7 +365,7 @@ class BotController extends Controller
             $assistant = $openAI->assistants()->create([
                 'name' => $request->nombre,
                 'instructions' => $request->instrucciones,
-                'model' => $request->modelo,
+                'model' => $request->model,
                 'temperature' => floatval($request->temperature), // Convertir a decimal
                 'top_p' => floatval($request->top_p), // Convertir a decimal
 
@@ -353,6 +386,7 @@ class BotController extends Controller
                 'openai_key' => $request->openai_key,
                 'openai_org' => $request->openai_org,
                 'openai_assistant' => $assistant->id,
+                'permitir_imagenes' => $request->allow_images ? 1 : 0, // Guardar estado
             ]);
 
             // Asociar el bot con la aplicación solo si se seleccionó una aplicación

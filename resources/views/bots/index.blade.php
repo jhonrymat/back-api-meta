@@ -396,6 +396,8 @@
                     $('#editOpenAIAssistant').val(response.data.openai_assistant);
                     $('#editAplicacionId').val(response.data
                         .aplicacion_id); // Seleccionar la aplicación
+                    // admitir imagenes en los chats
+                    $('#editAllowImages').val(response.data.permitir_imagenes);
 
                     // Una vez que se hayan cargado los datos, cerrar la alerta de SweetAlert
                     Swal.close();
@@ -783,5 +785,4 @@
             });
         });
     </script>
-
 @stop

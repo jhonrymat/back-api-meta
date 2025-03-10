@@ -19,6 +19,7 @@ class Bot extends Model
         'openai_assistant',
         'aplicacion_id', // Relación con la aplicación
         'webhook_url',
+        'permitir_imagenes'
     ];
 
     /**
