@@ -753,23 +753,27 @@
             document.addEventListener("click", function(event) {
                 if (event.target.classList.contains("saveWebhook")) {
                     let botId = event.target.getAttribute("data-botid");
-                    let webhookUrl = document.getElementById(`webhook_url_${botId}`).value;
+                    let webhookUrl = document.getElementById(`webhook_url_${botId}`).value.trim(); // 🔹 Eliminar espacios extra
 
-                    if (!webhookUrl.startsWith('http://') && !webhookUrl.startsWith('https://')) {
+                    // **Permitir valores vacíos (nulos)**
+                    if (webhookUrl === "") {
+                        webhookUrl = null; // ✅ Si está vacío, lo tratamos como NULL
+                    }
+                    // **Si no está vacío, validar que inicie con http:// o https://**
+                    else if (!webhookUrl.startsWith('http://') && !webhookUrl.startsWith('https://')) {
                         alert('La URL del webhook debe comenzar con http:// o https://');
                         return;
                     }
 
-                    // Guardar la URL sin verificarla
+                    // **Guardar la URL en el servidor**
                     fetch('guardar-webhook', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')
-                                    .getAttribute('content')
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                             },
                             body: JSON.stringify({
-                                webhook_url: webhookUrl,
+                                webhook_url: webhookUrl, // ✅ Puede ser NULL o una URL válida
                                 bot_id: botId
                             })
                         })
