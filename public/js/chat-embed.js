@@ -2,9 +2,10 @@ document.addEventListener('DOMContentLoaded', function () {
     // Agregar una hoja de estilos externa al DOM
     var link = document.createElement('link');
     link.rel = 'stylesheet';
+
     // local
     // link.href = 'http://127.0.0.1:8000/css/chat-embed.css';
-    link.href = 'https://maddigo.com.co/css/chat-embed.css'; // producción
+    link.href = 'https://maddigo.com.co/css/chat-embed.css';
     document.head.appendChild(link);
 
     var faLink = document.createElement('link');
@@ -332,7 +333,7 @@ function obtenerEstadoImagenes(botId) {
             }
 
             if (data.permitirImagenes) {
-                imagePreviewContainer.style.display = "inline-block"; // Mostrar el botón
+                imagePreviewContainer.style.display = "flex"; // Mostrar el botón
             } else {
                 imagePreviewContainer.style.display = "none"; // Ocultar el botón
             }
