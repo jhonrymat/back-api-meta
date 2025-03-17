@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Log;
 
 class Whatsapp
 {
-    public $baseUrl = 'https://graph.facebook.com/v18.0';
+    public $baseUrl = 'https://graph.facebook.com/v22.0';
     public $accessToken = '';
     public $phoneId = '';
     public $wabaId = '';
@@ -95,7 +95,7 @@ class Whatsapp
 
     public function numbersLoad($tokenApp, $waba_id_app)
     {
-        $baseUrlAPI = 'https://graph.facebook.com/v18.0';
+        $baseUrlAPI = 'https://graph.facebook.com/v22.0';
         return Http::withToken($tokenApp)->get($baseUrlAPI . '/' . $waba_id_app . '/phone_numbers?access_token=', $tokenApp)->throw()->json();
 
     }

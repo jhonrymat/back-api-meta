@@ -218,7 +218,7 @@ class MessageController extends Controller
 
                 $token = 'EAAVGPBd0gvkBO7kWVSz5E8tTEZBcwC86fkK3JwsUeYCxZA04aHWaOyvkpmQu94lZC6BViNmZAZA9jHilijZA1nFXdDqrlXGItIUFikMY4JM0tNJlzBGAOkOXZA1lgH4ZAd7y37WSqYXLggZAYu4x5nzZCtsi2amDY3ZBnIngGXVAwaZCTp0UOsvyIWE35hTYE10wcFZBH8nXA2E6p4M2GkRWD';
                 $phoneId = '131481643386780';
-                $version = 'v18.0';
+                $version = 'v22.0';
                 $payload = [
                     'messaging_product' => 'whatsapp',
                     'to' => $user->phone,
@@ -272,7 +272,7 @@ class MessageController extends Controller
 
                 $token = 'EAAVGPBd0gvkBO7kWVSz5E8tTEZBcwC86fkK3JwsUeYCxZA04aHWaOyvkpmQu94lZC6BViNmZAZA9jHilijZA1nFXdDqrlXGItIUFikMY4JM0tNJlzBGAOkOXZA1lgH4ZAd7y37WSqYXLggZAYu4x5nzZCtsi2amDY3ZBnIngGXVAwaZCTp0UOsvyIWE35hTYE10wcFZBH8nXA2E6p4M2GkRWD';
                 $phoneId = '131481643386780';
-                $version = 'v18.0';
+                $version = 'v22.0';
                 $payload = [
                     'messaging_product' => 'whatsapp',
                     'to' => $user->phone,

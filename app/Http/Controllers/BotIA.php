@@ -109,6 +109,7 @@ class BotIA extends Controller
 
             // 🔹 **Crear el contenido a enviar**
             $content = [];
+            
             if (!empty($question)) {
                 Log::info('Se agregó la pregunta al contenido.');
                 $content[] = ['type' => 'text', 'text' => $question];
@@ -226,6 +227,7 @@ class BotIA extends Controller
     {
         Log::info('Pregunta: ' . $question . ', Imagen: ' . $imageUrl . ', Bot ID: ' . $botId . ', Usuario: ' . $waId);
         $this->question = $question;
+        $bandera = true;
 
         // Obtener el bot y verificar si tiene un webhook habilitado
         $bot = Bot::find($botId);
@@ -239,11 +241,19 @@ class BotIA extends Controller
         if (!$thread) {
             // Crear un nuevo hilo con OpenAI y guardarlo en la base de datos
             $threadRun = $this->createAndRunThread($openai_key, $openai_org, $openai_assistant);
+
+            if (!$threadRun || empty($threadRun->threadId)) {
+                Log::error('No se pudo crear un hilo en OpenAI.');
+                return response()->json(['error' => 'No se pudo iniciar la conversación. Intenta de nuevo'], 500);
+            }
+
             $thread = Thread::create([
                 'wa_id' => $waId,
                 'thread_id' => $threadRun->threadId,
                 'bot_id' => $botId,
             ]);
+
+            $bandera = false;
         }
 
         if ($webhookUrl) {
@@ -273,13 +283,30 @@ class BotIA extends Controller
         // 🔹 Si hay imagen y texto, procesar ambos
         if (!empty($imageUrl)) {
             Log::info('Procesando imagen y texto...');
+
+            if (!$thread) {
+                Log::error('Error: No se encontró un hilo válido antes de procesar la imagen.');
+                return response()->json(['error' => 'No se pudo procesar la imagen correctamente.'], 500);
+            }
+
             return $this->processImageAndText($imageUrl, $question, $botId, $bot->openai_key, $bot->openai_org, $bot->openai_assistant, $waId, $thread->thread_id);
+
         } elseif (!empty($question)) {
             Log::info('Procesando solo texto...');
-            $threadRun = $this->continueThread($thread->thread_id, $openai_key, $openai_org, $openai_assistant);
-            // 🔹 Si NO hay un webhook, usar OpenAI directamente
+
+            if ($bandera) {
+                $threadRun = $this->continueThread($thread->thread_id, $openai_key, $openai_org, $openai_assistant);
+
+                if (!$threadRun) {
+                    Log::error('Error: No se pudo continuar el hilo en OpenAI.');
+                    return response()->json(['error' => 'No se pudo continuar la conversación. Intenta nuevamente.'], 500);
+                }
+                // 🔹 Si NO hay un webhook, usar OpenAI directamente
+            }
+
             return $this->loadAnswer($threadRun, $openai_key, $openai_org, $openai_assistant, $botId);
         } else {
+
             return response()->json(['error' => 'Debes enviar una pregunta o una imagen.'], 400);
         }
     }

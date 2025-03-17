@@ -792,4 +792,21 @@
             });
         });
     </script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            // Seleccionar todos los inputs de usuario y botones de enviar
+            document.querySelectorAll("[id^='user-input-']").forEach(function (input) {
+                const botId = input.id.replace("user-input-", "");
+                const sendButton = document.getElementById("send-btn-" + botId);
+
+                // Deshabilitar el botón al inicio
+                sendButton.disabled = true;
+
+                // Agregar evento de escucha para cuando se escriba en el input
+                input.addEventListener("input", function () {
+                    sendButton.disabled = input.value.trim() === "";
+                });
+            });
+        });
+    </script>
 @stop
