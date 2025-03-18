@@ -485,7 +485,7 @@
                 var imageInputElement = $('#image-input-' + botId)[0];
                 var imageInput = imageInputElement ? imageInputElement.files[0] : null;
                 var sendButton = $('#send-btn-' + botId); // Botón de enviar
-                var chatBox = $('#chat-box-' + botId); // Selecciona el chat-box correcto
+                var chatBox = $('#chat-box-bot-' + botId); // Selecciona el chat-box correcto
 
                 if (!userInput.trim() && !imageInput) {
                     return; // No enviar si no hay texto ni imagen
@@ -619,7 +619,7 @@
                                     'success'
                                 );
                                 // Limpia el contenido del chat en la interfaz
-                                $('#chat-box-' + botId).empty().append(
+                                $('#chat-box-bot-' + agente_Id).empty().append(
                                     '<div class="chat-message bot-message"><p>¡Hola! ¿Cómo puedo ayudarte hoy?</p></div>'
                                 );
                             },
@@ -755,7 +755,7 @@
                 if (event.target.classList.contains("saveWebhook")) {
                     let botId = event.target.getAttribute("data-botid");
                     let webhookUrl = document.getElementById(`webhook_url_${botId}`).value
-                .trim(); // 🔹 Eliminar espacios extra
+                        .trim(); // 🔹 Eliminar espacios extra
 
                     // **Permitir valores vacíos (nulos)**
                     if (webhookUrl === "") {
@@ -793,9 +793,9 @@
         });
     </script>
     <script>
-        document.addEventListener("DOMContentLoaded", function () {
+        document.addEventListener("DOMContentLoaded", function() {
             // Seleccionar todos los inputs de usuario y botones de enviar
-            document.querySelectorAll("[id^='user-input-']").forEach(function (input) {
+            document.querySelectorAll("[id^='user-input-']").forEach(function(input) {
                 const botId = input.id.replace("user-input-", "");
                 const sendButton = document.getElementById("send-btn-" + botId);
 
@@ -803,7 +803,7 @@
                 sendButton.disabled = true;
 
                 // Agregar evento de escucha para cuando se escriba en el input
-                input.addEventListener("input", function () {
+                input.addEventListener("input", function() {
                     sendButton.disabled = input.value.trim() === "";
                 });
             });

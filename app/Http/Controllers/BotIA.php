@@ -109,7 +109,7 @@ class BotIA extends Controller
 
             // 🔹 **Crear el contenido a enviar**
             $content = [];
-            
+
             if (!empty($question)) {
                 Log::info('Se agregó la pregunta al contenido.');
                 $content[] = ['type' => 'text', 'text' => $question];
@@ -258,8 +258,24 @@ class BotIA extends Controller
 
         if ($webhookUrl) {
             Log::info('Webhook configurado para este bot.');
-            // 🔹 Si hay un webhook configurado, enviar la solicitud a n8n
+
             try {
+                config(['openai.api_key' => $openai_key]);
+                config(['openai.organization' => $openai_org]);
+                // 🔹 Verificar si hay una ejecución activa antes de enviar otro mensaje
+                $runStatusResponse = OpenAI::threads()->runs()->list($thread->thread_id);
+
+                // Verificamos si hay algún "run" en progreso
+                $runData = collect($runStatusResponse->data)->first(); // Tomamos el más reciente
+                Log::info("estado" . $runData->status);
+
+                if ($runData && $runData->status === 'in_progress') {
+                    Log::info('🕒 Run en progreso. Notificando al usuario que espere.');
+
+                    return 'Procesando tu mensaje, por favor espera un momento...';
+                }
+
+                // 🔹 Si hay un webhook configurado, enviar la solicitud a n8n
                 $response = Http::post($webhookUrl, [
                     'message' => $question,
                     'image_url' => $imageUrl,
@@ -270,13 +286,12 @@ class BotIA extends Controller
 
                 // Procesar la respuesta de n8n
                 $n8nResponse = $response->json();
-                $this->answer = $n8nResponse['answer'] ?? 'Lo siento, no entendí tu mensaje.';
+                $this->answer = $n8nResponse['answer'] ?? 'Lo siento, no entendí tu mensaje. intentalo de nuevo.';
 
                 return $this->answer; // ✅ La función termina aquí y no sigue a los otros if
             } catch (\Exception $e) {
-                Log::error('Error al enviar solicitud a n8n: ' . $e->getMessage());
-                $this->answer = 'Hubo un problema al procesar tu mensaje.';
-                return $this->answer;
+                Log::error('❌ Error al procesar el mensaje n8n: ' . $e->getMessage());
+                return 'Hubo un problema al procesar tu mensaje.';
             }
         }
 
@@ -446,7 +461,7 @@ class BotIA extends Controller
         if ($isResponsePrompt) {
             // Si la respuesta es un prompt, guardar una cadena con el identificador
             Log::info('Respuesta generada como prompt: ' . $dataResponse);
-            $this->answer = 'PROMPT:' . $dataResponse;
+            return 'PROMPT:' . $dataResponse;
         } else {
             // Si no, guardar el mensaje normal
             $answer = $messageList->data[0]->content[0]->text->value ?? null;

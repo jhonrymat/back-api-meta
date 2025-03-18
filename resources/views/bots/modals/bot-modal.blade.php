@@ -12,7 +12,7 @@
                 </button>
             </div>
             <div class="modal-body">
-                <div class="chat-box" id="chat-box-{{ $bot->id }}">
+                <div class="chat-box" id="chat-box-bot-{{ $bot->id }}">
                     <div class="chat-message bot-message">
                         <p>¡Hola! ¿Cómo puedo ayudarte hoy?</p>
                     </div>
