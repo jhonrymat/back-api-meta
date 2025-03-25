@@ -40,7 +40,7 @@ class SendNewsletterJob implements ShouldQueue
 
         Mail::to($this->recipient->email)->send(
             new NewsletterTestMail($this->newsletter, $content, $this->emailTemplate)
-        );
+        )->from('contacto@contratacionlocal.com', 'Contratación Local');
         // Registrar en logs que el correo fue enviado con éxito
         \Log::info("Correo enviado exitosamente a: {$this->recipient->email}");
     }

@@ -23,7 +23,7 @@
 
         <!-- Body -->
         <div class="email-body" style="padding: 20px;">
-            <h3>{{ $newsletter->subject }}</h3>
+            {{-- <h3>{{ $newsletter->subject }}</h3> --}}
             {!! $content !!}
         </div>
 
