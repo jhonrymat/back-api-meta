@@ -28,7 +28,7 @@ class SendNewsletterJob implements ShouldQueue
     public function handle()
     {
         if (empty($this->recipient->email)) {
-            \Log::warning("Correo no enviado: destinatario sin email. ID: {$this->recipient->id}");
+            // \Log::warning("Correo no enviado: destinatario sin email. ID: {$this->recipient->id}");
             return; // Sale sin procesar el envío
         }
 
@@ -40,8 +40,8 @@ class SendNewsletterJob implements ShouldQueue
 
         Mail::to($this->recipient->email)->send(
             new NewsletterTestMail($this->newsletter, $content, $this->emailTemplate)
-        )->from('contacto@contratacionlocal.com', 'Contratación Local');
+        );
         // Registrar en logs que el correo fue enviado con éxito
-        \Log::info("Correo enviado exitosamente a: {$this->recipient->email}");
+        // \Log::info("Correo enviado exitosamente a: {$this->recipient->email}");
     }
 }

@@ -192,9 +192,9 @@ class NewsletterController extends Controller
 
     public function send(Request $request, Newsletter $newsletter)
     {
-        Log::info("Preparando envío de boletín...");
+        // Log::info("Preparando envío de boletín...");
         [$emailTemplate, $recipients] = $this->prepareNewsletterData($request, $newsletter);
-        Log::info("Destinatarios obtenidos: " . count($recipients));
+        // Log::info("Destinatarios obtenidos: " . count($recipients));
         $validated = $request->validate([
             'send_type' => 'required|in:immediate,scheduled',
             'scheduled_date' => 'nullable|date|after:now',

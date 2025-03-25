@@ -31,7 +31,8 @@ class NewsletterTestMail extends Mailable
             'emailTemplate' => $this->emailTemplate,
         ];
 
-        $email = $this->subject($this->newsletter->subject)
+        $email = $this->from('contacto@contratacionlocal.com', 'Contratación Local')
+            ->subject($this->newsletter->subject)
             ->view('emails.newsletter')
             ->with($viewData);
 
