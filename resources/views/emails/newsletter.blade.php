@@ -12,7 +12,7 @@
         <!-- Header -->
         <div class="logo-header" style="text-align: center; padding: 20px;">
             @if ($emailTemplate->logo)
-                <img src="{{ Storage::url($emailTemplate->logo) }}" alt="Logo"
+                <img src="{{ asset(Storage::url($emailTemplate->logo)) }}" alt="Logo"
                     style="max-width: 150px; margin-bottom: 10px;">
             @endif
         </div>
