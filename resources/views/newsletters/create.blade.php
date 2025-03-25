@@ -42,7 +42,7 @@
                     {{-- tags --}}
                     <div class="form-group mb-3">
                         <label for="tags">Seleccionar Etiqueta(s)</label>
-                        <select name="tags[]" id="tags" class="form-control" multiple required>
+                        <select name="tags[]" id="tags" class="form-control" multiple>
                             @foreach ($tags as $tag)
                                 <option value="{{ $tag->id }}">{{ $tag->nombre }} ({{ $tag->contactos->count() }}
                                     usuarios)</option>
