@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use App\Models\EmailTemplate;
 use App\Jobs\SendNewsletterJob;
 use App\Mail\NewsletterTestMail;
+use App\Jobs\SendBulkNewsletterJob;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
@@ -202,17 +203,19 @@ class NewsletterController extends Controller
 
         $sendType = $validated['send_type'];
 
-        foreach ($recipients as $recipient) {
-            Log::info("Encolando envío para: " . $recipient->email);
-            $job = new SendNewsletterJob($newsletter, $emailTemplate, $recipient);
+        // foreach ($recipients as $recipient) {
+        // Solo encolamos un job para todo el proceso
+        $job = new SendBulkNewsletterJob($newsletter, $emailTemplate, $recipients);
+        // Log::info("Encolando envío para: " . $recipient->email);
+        // $job = new SendNewsletterJob($newsletter, $emailTemplate, $recipient);
 
-            if ($sendType === 'scheduled') {
-                $scheduledDate = Carbon::parse($validated['scheduled_date']);
-                dispatch($job)->delay($scheduledDate);
-            } else {
-                dispatch($job);
-            }
+        if ($sendType === 'scheduled') {
+            $scheduledDate = Carbon::parse($validated['scheduled_date']);
+            dispatch($job)->delay($scheduledDate);
+        } else {
+            dispatch($job);
         }
+        // }
         Log::info("Todos los correos han sido encolados correctamente.");
 
         return redirect()->route('newsletters.index')->with(
