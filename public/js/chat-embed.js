@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // local
     // link.href = 'http://127.0.0.1:8000/css/chat-embed.css';
-    link.href = 'https://maddigo.com.co/css/chat-embed.css';
+    link.href = 'https://app.maddigo.com.co/css/chat-embed.css';
     document.head.appendChild(link);
 
     var faLink = document.createElement('link');
@@ -162,7 +162,7 @@ document.addEventListener('DOMContentLoaded', function () {
             formData.append('image', selectedImageFile);
 
             // fetch('http://127.0.0.1:8000/admin/upload-image', {
-            fetch('https://maddigo.com.co/admin/upload-image', {
+            fetch('https://app.maddigo.com.co/admin/upload-image', {
                 method: 'POST',
                 body: formData,
             })
@@ -221,7 +221,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // 🔹 Enviar mensaje a la IA
         // fetch('http://127.0.0.1:8000/admin/ask-bot-embedded', {
-        fetch('https://maddigo.com.co/admin/ask-bot-embedded', {
+        fetch('https://app.maddigo.com.co/admin/ask-bot-embedded', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -323,7 +323,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 function obtenerEstadoImagenes(botId) {
     // fetch(`http://127.0.0.1:8000/api/permitir-imagenes/${botId}`)
-    fetch(`https://maddigo.com.co/api/permitir-imagenes/${botId}`)
+    fetch(`https://app.maddigo.com.co/api/permitir-imagenes/${botId}`)
         .then(response => response.json())
         .then(data => {
             var imagePreviewContainer = document.getElementById('image-preview-container'); // Asegurar que el elemento existe
