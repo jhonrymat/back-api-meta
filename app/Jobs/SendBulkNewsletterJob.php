@@ -29,7 +29,7 @@ class SendBulkNewsletterJob implements ShouldQueue
     public function handle()
     {
         // Divide los destinatarios en lotes para enviarlos en grupos
-        $batchSize = 500; // Puedes ajustar este valor según el rendimiento de tu servidor
+        $batchSize = 100; // Puedes ajustar este valor según el rendimiento de tu servidor
         $this->recipients->chunk($batchSize)->each(function ($recipientBatch) {
             dispatch(new SendNewsletterBatchJob($this->newsletter, $this->emailTemplate, $recipientBatch));
         });

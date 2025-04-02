@@ -195,6 +195,7 @@ class BotIA extends Controller
                     'estado' => 'nuevo',
                 ]
             );
+            Log::info('Lead creado o actualizado correctamente: ' . json_encode($parameters));  
 
             return 'tus datos han sido guardados correctamente';
 
@@ -445,7 +446,7 @@ class BotIA extends Controller
                         $threadRun->id
                     );
                     // Espera 10 segundos antes de la próxima verificación
-                    sleep(5);
+                    sleep(10);
                     $attempts++;
                 }
 
