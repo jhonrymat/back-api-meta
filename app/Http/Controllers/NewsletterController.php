@@ -200,20 +200,15 @@ class NewsletterController extends Controller
             'email_template_id' => 'required|exists:email_templates,id',
         ]);
 
-        // Obtener la plantilla de correo y los destinatarios
+        // Obtener la plantilla de correo
         $emailTemplate = EmailTemplate::find($validated['email_template_id']);
-        $recipients = $newsletter->getRecipients();
 
         // Verificar si hay destinatarios
-        if ($recipients->isEmpty()) {
-            return redirect()->back()->with('warning', 'No hay destinatarios para este boletín.');
-        }
-
-        // Determinar el tipo de envío (inmediato o programado)
+        // Mover la lógica de obtener los destinatarios a la cola
         $sendType = $validated['send_type'];
 
         // Preparar el trabajo para enviar el boletín
-        $job = new SendBulkNewsletterJob($newsletter, $emailTemplate, $recipients);
+        $job = new SendBulkNewsletterJob($newsletter, $emailTemplate);
 
         // Si es un envío programado, retrasar el trabajo
         if ($sendType === 'scheduled') {
@@ -233,6 +228,7 @@ class NewsletterController extends Controller
             : 'El boletín se está enviando.'
         );
     }
+
 
 
 

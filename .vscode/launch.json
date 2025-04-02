@@ -16,7 +16,7 @@
             "request": "launch",
             "program": "${file}",
             "cwd": "${fileDirname}",
-            "port": 0,
+            "port": 9003,
             "runtimeArgs": [
                 "-dxdebug.start_with_request=yes"
             ],
@@ -33,7 +33,7 @@
                 "-dxdebug.mode=debug",
                 "-dxdebug.start_with_request=yes",
                 "-S",
-                "localhost:0"
+                "localhost:8000"
             ],
             "program": "",
             "cwd": "${workspaceRoot}",
