@@ -4,6 +4,7 @@ use App\Models\Newsletter;
 use App\Models\EmailTemplate;
 use Illuminate\Bus\Queueable;
 use App\Mail\NewsletterTestMail;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
@@ -41,7 +42,7 @@ class SendNewsletterJob implements ShouldQueue
         Mail::to($this->recipient->email)->send(
             new NewsletterTestMail($this->newsletter, $content, $this->emailTemplate)
         );
-        // Registrar en logs que el correo fue enviado con éxito
-        // \Log::info("Correo enviado exitosamente a: {$this->recipient->email}");
+        // Simulación: Solo registra en los logs, no enviamos realmente el correo
+        // Log::info("Correo encolado para el destinatario: {$this->recipient->email}");
     }
 }

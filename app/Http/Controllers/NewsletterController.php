@@ -193,31 +193,39 @@ class NewsletterController extends Controller
 
     public function send(Request $request, Newsletter $newsletter)
     {
-        // Log::info("Preparando envío de boletín...");
-        [$emailTemplate, $recipients] = $this->prepareNewsletterData($request, $newsletter);
-        // Log::info("Destinatarios obtenidos: " . count($recipients));
+        // Validar la entrada del formulario
         $validated = $request->validate([
             'send_type' => 'required|in:immediate,scheduled',
             'scheduled_date' => 'nullable|date|after:now',
+            'email_template_id' => 'required|exists:email_templates,id',
         ]);
 
+        // Obtener la plantilla de correo y los destinatarios
+        $emailTemplate = EmailTemplate::find($validated['email_template_id']);
+        $recipients = $newsletter->getRecipients();
+
+        // Verificar si hay destinatarios
+        if ($recipients->isEmpty()) {
+            return redirect()->back()->with('warning', 'No hay destinatarios para este boletín.');
+        }
+
+        // Determinar el tipo de envío (inmediato o programado)
         $sendType = $validated['send_type'];
 
-        // foreach ($recipients as $recipient) {
-        // Solo encolamos un job para todo el proceso
+        // Preparar el trabajo para enviar el boletín
         $job = new SendBulkNewsletterJob($newsletter, $emailTemplate, $recipients);
-        // Log::info("Encolando envío para: " . $recipient->email);
-        // $job = new SendNewsletterJob($newsletter, $emailTemplate, $recipient);
 
+        // Si es un envío programado, retrasar el trabajo
         if ($sendType === 'scheduled') {
             $scheduledDate = Carbon::parse($validated['scheduled_date']);
             dispatch($job)->delay($scheduledDate);
         } else {
+            // Enviar de inmediato
+            Log::info('Enviando boletín inmediatamente.');
             dispatch($job);
         }
-        // }
-        Log::info("Todos los correos han sido encolados correctamente.");
 
+        // Retorno con mensaje de éxito según el tipo de envío
         return redirect()->route('newsletters.index')->with(
             'success',
             $sendType === 'scheduled'
@@ -225,6 +233,11 @@ class NewsletterController extends Controller
             : 'El boletín se está enviando.'
         );
     }
+
+
+
+
+
 
 
 

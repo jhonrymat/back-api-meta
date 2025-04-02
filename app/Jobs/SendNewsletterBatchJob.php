@@ -1,5 +1,6 @@
 <?php
 namespace App\Jobs;
+
 use App\Models\Newsletter;
 use App\Models\EmailTemplate;
 use Illuminate\Bus\Queueable;
@@ -10,7 +11,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 
-class SendBulkNewsletterJob implements ShouldQueue
+class SendNewsletterBatchJob implements ShouldQueue
 {
     use Dispatchable, Queueable, SerializesModels;
 
@@ -25,13 +26,23 @@ class SendBulkNewsletterJob implements ShouldQueue
         $this->recipients = $recipients;
     }
 
-
     public function handle()
     {
-        // Divide los destinatarios en lotes para enviarlos en grupos
-        $batchSize = 500; // Puedes ajustar este valor según el rendimiento de tu servidor
-        $this->recipients->chunk($batchSize)->each(function ($recipientBatch) {
-            dispatch(new SendNewsletterBatchJob($this->newsletter, $this->emailTemplate, $recipientBatch));
-        });
+        foreach ($this->recipients as $recipient) {
+            if (empty($recipient->email)) {
+                // Si no hay correo, no lo enviamos
+                continue;
+            }
+
+            $content = str_replace(
+                ['{{nombre}}', '{{email}}'],
+                [$recipient->name ?? 'Usuario', $recipient->email],
+                $this->newsletter->content
+            );
+
+            Mail::to($recipient->email)->send(
+                new NewsletterTestMail($this->newsletter, $content, $this->emailTemplate)
+            );
+        }
     }
 }
