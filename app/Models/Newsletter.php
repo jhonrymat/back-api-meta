@@ -12,10 +12,13 @@ class Newsletter extends Model
         'has_attachment',
         'attachment_path',
         'content',
+        'is_cancelled',
+        'is_sent', // 👈 Agregado
     ];
 
     protected $casts = [
         'is_cancelled' => 'boolean',
+        'is_sent' => 'boolean', // 👈 Agregado
     ];
 
     public function getAttachmentUrlAttribute()

@@ -19,6 +19,7 @@ return new class extends Migration
             $table->string('attachment_path')->nullable(); // Ruta del archivo adjunto (opcional)
             $table->longText('content')->nullable();
             $table->boolean('is_cancelled')->default(false);
+            $table->boolean('is_sent')->default(false);
             $table->timestamps();
         });
     }

@@ -217,6 +217,9 @@ class NewsletterController extends Controller
             dispatch(new SendBulkNewsletterJob($newsletter, $emailTemplate))->onQueue('email-queue');
         }
 
+        // Marca como encolado/enviado
+        $newsletter->update(['is_sent' => true]);
+
         // Retorno con mensaje de éxito según el tipo de envío
         return redirect()->route('newsletters.index')->with(
             'success',
