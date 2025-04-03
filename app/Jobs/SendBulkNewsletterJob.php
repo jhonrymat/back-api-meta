@@ -27,25 +27,21 @@ class SendBulkNewsletterJob implements ShouldQueue
 
     public function handle()
     {
-        // Obtener los destinatarios dentro del job
         $recipients = $this->newsletter->getRecipients();
 
-        // Verificar si hay destinatarios
         if ($recipients->isEmpty()) {
             Log::warning('No hay destinatarios para el boletín.');
             return;
         }
 
-        // Divide los destinatarios en lotes para enviarlos en grupos
-        $batchSize = 100; // Puedes ajustar este valor según el rendimiento de tu servidor
-        $recipients->chunk($batchSize)->each(function ($recipientBatch) {
-            // Intentar enviar un lote de correos
-            try {
-                dispatch(new SendNewsletterBatchJob($this->newsletter, $this->emailTemplate, $recipientBatch));
-            } catch (\Exception $e) {
-                // Si algo falla, registramos el error
-                Log::error('Error al enviar lote de boletines: ' . $e->getMessage());
+        foreach ($recipients as $recipient) {
+            if (empty($recipient->email)) {
+                continue;
             }
-        });
+
+            // Despachar un job por destinatario
+            dispatch(new SendNewsletterToUserJob($recipient, $this->newsletter, $this->emailTemplate))
+                ->onQueue('email-queue');
+        }
     }
 }

@@ -207,17 +207,14 @@ class NewsletterController extends Controller
         // Mover la lógica de obtener los destinatarios a la cola
         $sendType = $validated['send_type'];
 
-        // Preparar el trabajo para enviar el boletín
-        $job = new SendBulkNewsletterJob($newsletter, $emailTemplate);
-
         // Si es un envío programado, retrasar el trabajo
         if ($sendType === 'scheduled') {
             $scheduledDate = Carbon::parse($validated['scheduled_date']);
-            dispatch($job)->delay($scheduledDate);
+            dispatch(new SendBulkNewsletterJob($newsletter, $emailTemplate))->delay($scheduledDate)->onQueue('email-queue');
         } else {
             // Enviar de inmediato
             Log::info('Enviando boletín inmediatamente.');
-            dispatch($job);
+            dispatch(new SendBulkNewsletterJob($newsletter, $emailTemplate))->onQueue('email-queue');
         }
 
         // Retorno con mensaje de éxito según el tipo de envío

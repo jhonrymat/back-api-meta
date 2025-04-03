@@ -10,6 +10,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Log;
 
 class SendNewsletterBatchJob implements ShouldQueue
 {
@@ -27,22 +28,23 @@ class SendNewsletterBatchJob implements ShouldQueue
     }
 
     public function handle()
-    {
-        foreach ($this->recipients as $recipient) {
-            if (empty($recipient->email)) {
-                // Si no hay correo, no lo enviamos
-                continue;
-            }
+{
+    $recipients = $this->newsletter->getRecipients();
 
-            $content = str_replace(
-                ['{{nombre}}', '{{email}}'],
-                [$recipient->name ?? 'Usuario', $recipient->email],
-                $this->newsletter->content
-            );
-
-            Mail::to($recipient->email)->send(
-                new NewsletterTestMail($this->newsletter, $content, $this->emailTemplate)
-            );
-        }
+    if ($recipients->isEmpty()) {
+        Log::warning('No hay destinatarios para el boletín.');
+        return;
     }
+
+    foreach ($recipients as $recipient) {
+        if (empty($recipient->email)) {
+            continue;
+        }
+
+        // Despachar un job por destinatario
+        dispatch(new SendNewsletterToUserJob($recipient, $this->newsletter, $this->emailTemplate))
+            ->onQueue('email-queue');
+    }
+}
+
 }
