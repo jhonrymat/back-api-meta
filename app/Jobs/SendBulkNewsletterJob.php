@@ -34,6 +34,8 @@ class SendBulkNewsletterJob implements ShouldQueue
             return;
         }
 
+        Log::info('Enviando boletín a ' . $recipients->count() . ' destinatarios.');
+
         foreach ($recipients as $recipient) {
             if (empty($recipient->email)) {
                 continue;

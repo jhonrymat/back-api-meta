@@ -17,7 +17,7 @@ class NewsletterController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Newsletter::where('user_id', Auth::id()); // Filtrar por el usuario autenticado
+        $query = Newsletter::where('user_id', Auth::id())->orderByDesc('created_at'); // Filtrar por el usuario autenticado
 
         if ($request->filled('search')) {
             $query->where('name', 'like', '%' . $request->search . '%');

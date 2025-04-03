@@ -40,7 +40,7 @@ class SendNewsletterToUserJob implements ShouldQueue
         );
 
         try {
-            Log::info('Enviando boletín a ' . $this->recipient->email);
+            // Log::info('Enviando boletín a ' . $this->recipient->email);
             Mail::to($this->recipient->email)->send(
                 new NewsletterTestMail($this->newsletter, $content, $this->emailTemplate)
             );
