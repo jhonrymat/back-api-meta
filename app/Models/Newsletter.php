@@ -13,6 +13,11 @@ class Newsletter extends Model
         'attachment_path',
         'content',
     ];
+
+    protected $casts = [
+        'is_cancelled' => 'boolean',
+    ];
+
     public function getAttachmentUrlAttribute()
     {
         return $this->attachment_path ? asset('storage/' . $this->attachment_path) : null;

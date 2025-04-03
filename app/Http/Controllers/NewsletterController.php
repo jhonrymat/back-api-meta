@@ -226,11 +226,12 @@ class NewsletterController extends Controller
         );
     }
 
+    public function cancel(Newsletter $newsletter)
+    {
+        $newsletter->update(['is_cancelled' => true]);
 
-
-
-
-
+        return redirect()->back()->with('success', 'El boletín fue cancelado correctamente.');
+    }
 
 
 

@@ -29,6 +29,13 @@ class SendNewsletterToUserJob implements ShouldQueue
 
     public function handle()
     {
+        // Recargar el estado actualizado del boletín
+        $this->newsletter->refresh();
+
+        if ($this->newsletter->is_cancelled) {
+            Log::info("Boletín cancelado. No se enviará a: {$this->recipient->email}");
+            return;
+        }
         if (empty($this->recipient->email)) {
             return;
         }

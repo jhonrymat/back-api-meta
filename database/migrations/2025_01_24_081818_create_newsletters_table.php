@@ -11,13 +11,14 @@ return new class extends Migration
     {
         Schema::create('newsletters', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');   
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->string('name'); // Nombre del boletín
             $table->string('subject'); // Asunto del correo
             $table->string('copy_email')->nullable(); // Correo de copia (opcional)
             $table->boolean('has_attachment')->default(false); // Indica si tiene archivo adjunto
             $table->string('attachment_path')->nullable(); // Ruta del archivo adjunto (opcional)
             $table->longText('content')->nullable();
+            $table->boolean('is_cancelled')->default(false);
             $table->timestamps();
         });
     }

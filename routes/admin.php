@@ -188,6 +188,8 @@ Route::post('newsletters/{newsletter}/send-test', [NewsletterController::class, 
 Route::post('newsletters/{newsletter}/send', [NewsletterController::class, 'send'])->name('newsletters.send');
 Route::resource('newsletters', NewsletterController::class);
 Route::get('newsletters/{newsletter}/recipients/count', [NewsletterController::class, 'countRecipients']);
+Route::patch('/newsletters/{newsletter}/cancel', [NewsletterController::class, 'cancel'])->name('newsletters.cancel');
+
 
 // Genera todas las rutas necesarias para el recurso EmailTemplate
 Route::get('email-templates', [EmailTemplateController::class, 'index'])->name('email-templates.index');

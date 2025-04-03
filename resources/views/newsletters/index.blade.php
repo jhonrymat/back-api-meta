@@ -62,6 +62,15 @@
                                         class="btn btn-warning btn-sm">Editar</a>
                                     <button class="btn btn-danger btn-sm delete-btn" data-id="{{ $newsletter->id }}"
                                         data-url="{{ route('newsletters.destroy', $newsletter->id) }}">Eliminar</button>
+                                    @if (!$newsletter->is_cancelled)
+                                        <form method="POST" action="{{ route('newsletters.cancel', $newsletter) }}">
+                                            @csrf
+                                            @method('PATCH')
+                                            <button type="submit" class="btn btn-danger">Cancelar envío</button>
+                                        </form>
+                                    @else
+                                        <span class="text-danger">Cancelado</span>
+                                    @endif
                                 </td>
                             </tr>
                         @empty
