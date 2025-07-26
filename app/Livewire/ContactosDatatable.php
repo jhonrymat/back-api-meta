@@ -5,14 +5,23 @@ namespace App\Livewire;
 use Rappasoft\LaravelLivewireTables\DataTableComponent;
 use Rappasoft\LaravelLivewireTables\Views\Column;
 use App\Models\Contacto;
+use Illuminate\Support\Facades\Auth;
 
 class ContactosDatatable extends DataTableComponent
 {
-    protected $model = Contacto::class;
+    //protected $model = Contacto::class;
     protected $listeners = ['Updated' => '$refresh']; // Refrescar la tabla
 
     public ?int $searchFilterDebounce = 600;
     public array $perPageAccepted = [10, 20, 50, 100];
+
+    public function builder(): \Illuminate\Database\Eloquent\Builder
+    {
+        return Contacto::with('tags')->whereHas('users', function ($query) {
+            $query->where('user_id', Auth::id());
+        });
+    }
+
     public function configure(): void
     {
         $this->setPrimaryKey('id');

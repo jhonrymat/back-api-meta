@@ -57,7 +57,7 @@ class Contacto extends Model
 
     public function users()
     {
-        return $this->belongsToMany(User::class, 'user_contacts', 'user_id', 'contacto_id');
+        return $this->belongsToMany(User::class, 'user_contacts', 'contacto_id', 'user_id');
     }
 
     public function tags()
