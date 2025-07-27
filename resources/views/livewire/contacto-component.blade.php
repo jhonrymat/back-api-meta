@@ -28,12 +28,14 @@
     </div>
     <!-- Modal para Editar -->
     @if ($showEditModal)
-        <div class="modal fade show" style="display: block;">
+        <div class="modal fade show" style="display: block;" data-bs-backdrop="static" data-bs-keyboard="false">
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Editar Contacto</h5>
-                        <button class="btn-close" wire:click="$set('showEditModal', false)"></button>
+                        <button class="btn-close" wire:click="$set('showEditModal', false)" wire:loading.attr="disabled"
+                            wire:loading.class="disabled" wire:target="update"></button>
+
                     </div>
                     <div class="modal-body">
                         <input type="text" wire:model.defer="nombre" class="form-control mb-2" placeholder="Nombre">
@@ -51,8 +53,17 @@
                         </select>
                     </div>
                     <div class="modal-footer">
-                        <button class="btn btn-secondary" wire:click="$set('showEditModal', false)">Cancelar</button>
-                        <button class="btn btn-primary" wire:click="update">Guardar</button>
+                        <button class="btn btn-secondary" wire:click="$set('showEditModal', false)"
+                            wire:loading.attr="disabled" wire:loading.class="disabled" wire:target="update">
+                            Cancelar
+                        </button>
+
+                        <button class="btn btn-primary" wire:click="update" wire:loading.attr="disabled">
+                            <span wire:loading.remove wire:target="update">Guardar</span>
+                            <span wire:loading wire:target="update">
+                                <i class="fas fa-spinner fa-spin"></i> Guardando...
+                            </span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -78,5 +89,6 @@
             </div>
         </div>
     @endif
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <x-sweet-alert-good></x-sweet-alert-good>
 </div>

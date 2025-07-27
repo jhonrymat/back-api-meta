@@ -440,6 +440,7 @@ return [
         ],
         [
             'text' => 'Gestión Correos',
+            'can' => 'emails',
             'icon' => 'fas fa-fw fa-envelope-open-text', // Puedes cambiar el ícono
             'submenu' => [
                 [

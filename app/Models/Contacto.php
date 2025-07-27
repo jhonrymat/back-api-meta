@@ -25,7 +25,7 @@ class Contacto extends Model
     // }
     public function messages()
     {
-        return $this->hasMany(Message::class, 'telefono', 'wa_id');
+        return $this->hasMany(Message::class, 'wa_id', 'telefono');
     }
 
     public function createWithTags(array $data, $clientId)

@@ -19,25 +19,34 @@ class UserController extends Controller
         ]);
     }
     public function store(Request $request)
-    {
-        try {
-            $users = new User();
-            $users->nombre = $request->nombre;
-            $users->descripcion = $request->descripcion;
-            $users->color = $request->color;
-            $users->save();
+{
+    try {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+            'phone' => 'nullable|string|max:20',
+            'password' => 'required|string|min:6',
+        ]);
 
-            return response()->json([
-                'success' => true,
-                'data' => $users,
-            ], 200);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'error' => $e->getMessage(),
-            ], 500);
-        }
+        $user = new User();
+        $user->name = $validated['name'];
+        $user->email = $validated['email'];
+        $user->phone = $validated['phone'] ?? null;
+        $user->password = bcrypt($validated['password']);
+        $user->save();
+
+        return response()->json([
+            'success' => true,
+            'data' => $user,
+        ], 201);
+    } catch (Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage(),
+        ], 500);
     }
+}
+
 
     public function update(Request $request, $id)
     {

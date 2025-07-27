@@ -19,6 +19,7 @@ use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Validation\Rule;
 
 class ContactoController extends Controller
 {
@@ -44,12 +45,15 @@ class ContactoController extends Controller
             // Validar la entrada
             $data = $request->validate([
                 'nombre' => 'required|string|max:255',
-                'apellido' => 'sometimes|string|max:255',
-                'correo' => 'sometimes|email|max:255',
+                'apellido' => 'sometimes|nullable|string|max:255',
+                'correo' => 'sometimes|nullable|email|max:255',
                 'telefono' => 'required|string',
                 'notas' => 'nullable|string',
                 'etiqueta' => 'sometimes|array',
-                'etiqueta.*' => 'integer|exists:tags,id,user_id,' . $user->id,  // Asegura que los tags existen y pertenecen al usuario
+                'etiqueta.*' => [
+                    'integer',
+                    Rule::exists('tags', 'id')->where('user_id', $user->id),
+                ],
             ]);
 
 
@@ -83,15 +87,18 @@ class ContactoController extends Controller
                 $contacto->tags()->syncWithoutDetaching($data['etiqueta']);
             }
 
-            if (isset($data['custom_fields'])) {
+            if (isset($request->custom_fields) && is_array($request->custom_fields)) {
                 // Guardar los valores de los campos personalizados
                 foreach ($request->custom_fields as $fieldId => $value) {
-                    CustomFieldValue::create([
-                        'contacto_id' => $contacto->id,
-                        'custom_field_id' => $fieldId,
-                        'value' => $value,
-                    ]);
+                    if (!is_null($value) && $value !== '') {
+                        CustomFieldValue::create([
+                            'contacto_id' => $contacto->id,
+                            'custom_field_id' => $fieldId,
+                            'value' => $value,
+                        ]);
+                    }
                 }
+
             }
 
 
@@ -101,9 +108,12 @@ class ContactoController extends Controller
                 ->route('contactos.index') // Cambia esto a tu ruta correspondiente
                 ->with('success', 'Contacto creado correctamente.');
         } catch (Exception $e) {
-            return redirect()
-                ->route('contactos.index')
-                ->with('error', 'Hubo un problema al crear el contacto. Por favor, inténtalo nuevamente.');
+            // return redirect()
+            //     ->route('contactos.index')
+            //     ->with('error', 'Hubo un problema al crear el contacto. Por favor, inténtalo nuevamente.');
+            Log::error('Error al crear contacto: ' . $e->getMessage());
+            throw $e;
+
         }
     }
 

@@ -74,8 +74,14 @@ class ContactoComponent extends Component
     public function delete()
     {
         $contacto = Contacto::findOrFail($this->selectedId);
+        // 🚫 Verificar si tiene mensajes asociados
+        if ($contacto->messages()->exists()) {
+            $this->dispatch('sweet-alert-good', icon: 'error', title: 'Error', text: 'No se puede eliminar un contacto con mensajes asociados.');
+            return;
+        }
         $contacto->tags()->detach();
         $contacto->delete();
+
         $this->resetModal();
         $this->dispatch('Updated');
         $this->dispatch('sweet-alert-good', icon: 'success', title: 'Exito.!', text: 'Contacto eliminado correctamente.');
