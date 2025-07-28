@@ -403,7 +403,7 @@ return [
                             'icon' => 'fas fa-fw fa-chart-line',
                         ],
                         [
-                            'text' => 'Envios del dí<a href=""></a>',
+                            'text' => 'Envios del día',
                             'route' => 'conteo.por-dia',
                             'can' => 'plantillas',
                             'icon' => 'fas fa-fw fa-hourglass-end',
