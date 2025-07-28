@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\MessagesComponente;
 use App\Models\Tag;
 use App\Models\User;
 use App\Events\Webhook;
@@ -51,7 +52,10 @@ Route::middleware(['auth'])->group(function () {
 Route::get('/health', function () {
     return response()->json(['status' => 'ok'], 200);
 });
+// Obtener contactos de cada usuario
 Route::get('contact', ContactoComponent::class)->name('contact.index');
+
+Route::get('envios', MessagesComponente::class)->name('envios');
 
 
 Route::get('/public/contact-form/{userId}/{token}', function ($userId, $token) {

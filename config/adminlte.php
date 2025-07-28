@@ -1,5 +1,7 @@
 <?php
 
+use Illuminate\Validation\Rules\Can;
+
 return [
 
     /*
@@ -193,7 +195,7 @@ return [
     'classes_content_header' => '',
     'classes_content' => '',
     'classes_sidebar' => 'sidebar-dark-primary elevation-4',
-    'classes_sidebar_nav' => '',
+    'classes_sidebar_nav' => 'nav nav-pills nav-sidebar flex-column nav-child-indent',
     'classes_topnav' => 'navbar-dark navbar-light',
     'classes_topnav_nav' => 'navbar-expand',
     'classes_topnav_container' => 'container',
@@ -400,6 +402,12 @@ return [
                             'can' => 'envios-plantillas',
                             'icon' => 'fas fa-fw fa-chart-line',
                         ],
+                        [
+                            'text' => 'Envios del dí<a href=""></a>',
+                            'route' => 'conteo.por-dia',
+                            'can' => 'plantillas',
+                            'icon' => 'fas fa-fw fa-hourglass-end',
+                        ],
                     ],
                 ],
                 [
@@ -440,44 +448,47 @@ return [
         ],
         [
             'text' => 'Gestión Correos',
-            'can' => 'emails',
             'icon' => 'fas fa-fw fa-envelope-open-text', // Puedes cambiar el ícono
             'submenu' => [
                 [
                     'text' => 'Grupos Mails',
                     'route' => 'groups.index',
+                    'can' => 'groups.index',
                     'icon' => 'fas fa-fw fa-users',
                 ],
                 [
                     'text' => 'Boletines',
                     'route' => 'newsletters.index',
+                    'can' => 'newsletters.index',
                     'icon' => 'fas fa-fw fa-newspaper',
                 ],
                 [
                     'text' => 'Plantillas',
                     'route' => 'email-templates.index',
+                    'can' => 'email-templates.index',
                     'icon' => 'fas fa-fw fa-file-invoice',
-                ],
-                [
-                    'text' => 'Estadisticas',
-                    'route' => 'programados',
-                    'icon' => 'fas fa-fw fa-poll',
-                ],
-                [
-                    'text' => 'Reportes',
-                    'route' => 'programados',
-                    'icon' => 'fas fa-fw fa-chart-bar',
-                ],
-                [
-                    'text' => 'Busqueda de mails',
-                    'route' => 'programados',
-                    'icon' => 'fas fa-fw fa-search',
-                ],
-                [
-                    'text' => 'Mails Bloqueados',
-                    'route' => 'programados',
-                    'icon' => 'fas fa-fw fa-inbox',
-                ],
+                ]
+                // ,
+                // [
+                //     'text' => 'Estadisticas',
+                //     'route' => 'programados',
+                //     'icon' => 'fas fa-fw fa-poll',
+                // ],
+                // [
+                //     'text' => 'Reportes',
+                //     'route' => 'programados',
+                //     'icon' => 'fas fa-fw fa-chart-bar',
+                // ],
+                // [
+                //     'text' => 'Busqueda de mails',
+                //     'route' => 'programados',
+                //     'icon' => 'fas fa-fw fa-search',
+                // ],
+                // [
+                //     'text' => 'Mails Bloqueados',
+                //     'route' => 'programados',
+                //     'icon' => 'fas fa-fw fa-inbox',
+                // ],
             ],
         ],
         [

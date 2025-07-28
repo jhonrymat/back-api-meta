@@ -27,6 +27,20 @@ class Kernel extends ConsoleKernel
 
         // Ejecutar el comando cada día a las 12:00 AM
         $schedule->command('statistics:update-summary')->dailyAt('00:00');
+
+        // Ejecuta cada hora con la fecha actual
+        $schedule->call(function () {
+            \Artisan::call('estadisticas:generar', [
+                '--fecha' => now()->toDateString(),
+            ]);
+        })->hourly();
+
+        // Ejecuta diariamente a la 1:00 am con fecha del día anterior
+        $schedule->call(function () {
+            \Artisan::call('estadisticas:generar', [
+                '--fecha' => now()->subDay()->toDateString(),
+            ]);
+        })->dailyAt('01:00');
     }
 
     /**

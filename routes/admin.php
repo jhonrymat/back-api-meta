@@ -17,6 +17,7 @@ use App\Http\Controllers\LeadsController;
 use App\Http\Controllers\RolesController;
 
 use App\Http\Controllers\ClocalController;
+use App\Http\Controllers\ConteoController;
 use App\Http\Controllers\ChatBotController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\NumerosController;
@@ -190,6 +191,8 @@ Route::resource('newsletters', NewsletterController::class);
 Route::get('newsletters/{newsletter}/recipients/count', [NewsletterController::class, 'countRecipients']);
 Route::patch('newsletters/{newsletter}/cancel', [NewsletterController::class, 'cancel'])->name('newsletters.cancel');
 
+//conteo de menajes diarios:
+Route::get('/conteo/por-dia', [ConteoController::class, 'verPorDia'])->middleware('can:plantillas')->name('conteo.por-dia');
 
 // Genera todas las rutas necesarias para el recurso EmailTemplate
 Route::get('email-templates', [EmailTemplateController::class, 'index'])->name('email-templates.index');
