@@ -51,7 +51,10 @@ class MessagesTable extends DataTableComponent
     {
         return [
             Column::make("ID", "id")->sortable()->collapseOnMobile(),
-            Column::make("Celular", "wa_id")->sortable()->searchable()->collapseOnMobile(),
+            Column::make("Celular", "wa_id")
+                ->sortable()
+                ->searchable(fn($builder, $term) => $builder->where('wa_id', 'LIKE', "$term%"))
+                ->collapseOnMobile(),
             Column::make("Estado", "status")
                 ->sortable()
                 ->format(fn($value) => $this->badgeStatus($value))
