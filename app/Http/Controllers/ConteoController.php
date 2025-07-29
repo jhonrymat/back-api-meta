@@ -12,11 +12,13 @@ class ConteoController extends Controller
     {
         $user = Auth::user();
 
-        // Valor por defecto si no viene en la URL
+        // Fecha seleccionada o por defecto la actual
         $fecha = $request->input('fecha', now()->toDateString());
 
+        // Obtener los phone_id del usuario autenticado
         $phoneIds = $user->numeros()->pluck('id_telefono');
 
+        // Consultar y agrupar los datos por phone_id
         $datos = StatsDiario::where('fecha', $fecha)
             ->whereIn('phone_id', $phoneIds)
             ->orderBy('phone_id')
@@ -24,8 +26,21 @@ class ConteoController extends Controller
             ->get()
             ->groupBy('phone_id');
 
-        // ✅ Pasar $fecha y $datos a la vista
-        return view('conteo.index', compact('fecha', 'datos'));
-    }
+        // Consolidar por estado (ignorando distintivo)
+        $agrupados = [];
 
+        foreach ($datos as $phoneId => $registros) {
+            $agrupados[$phoneId] = collect($registros)
+                ->groupBy('status')
+                ->map(function ($items, $status) {
+                    return (object)[
+                        'status' => $status,
+                        'total' => $items->sum('total'),
+                    ];
+                })->values();
+        }
+
+        // Retornar la vista con fecha y datos agrupados
+        return view('conteo.index', compact('fecha', 'agrupados'));
+    }
 }

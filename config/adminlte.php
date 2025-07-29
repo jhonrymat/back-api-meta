@@ -403,10 +403,17 @@ return [
                             'icon' => 'fas fa-fw fa-chart-line',
                         ],
                         [
-                            'text' => 'Envios del día',
+                            'text' => 'Envios por día',
                             'route' => 'conteo.por-dia',
                             'can' => 'plantillas',
                             'icon' => 'fas fa-fw fa-hourglass-end',
+                        ],
+                        [
+                            'text' => 'Registro de envíos',
+                            'route' => 'envios',
+                            'can' => 'estadisticas',
+                            'icon' => 'fas fa-fw fa-calendar-alt',
+                            'target' => '_blank',
                         ],
                     ],
                 ],

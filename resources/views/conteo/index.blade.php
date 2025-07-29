@@ -5,6 +5,10 @@
 @section('content')
     <div class="container">
         <h2 class="mb-4">📅 Estadísticas del día {{ \Carbon\Carbon::parse($fecha)->format('d M Y') }}</h2>
+        {{-- mensaje para el cliente para avisar que los datos se actualizan cada hora --}}
+        <div class="alert alert-info">
+            Los datos se actualizan cada hora.
+        </div>
 
         <form method="GET" class="mb-4 d-flex gap-3 align-items-end">
             <div>
@@ -14,7 +18,7 @@
             <button class="btn btn-primary">Consultar</button>
         </form>
 
-        @forelse($datos as $phoneId => $registros)
+        @forelse($agrupados as $phoneId => $registros)
             <div class="card mb-4">
                 <div class="card-header bg-dark text-white">
                     <strong>📞 Número (phone_id):</strong> {{ $phoneId }}
@@ -49,6 +53,7 @@
                 No hay datos para esta fecha.
             </div>
         @endforelse
+
     </div>
 @endsection
 @section('css')
