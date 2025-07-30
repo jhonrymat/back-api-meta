@@ -6,6 +6,18 @@
 @section('adminlte_css')
     @stack('css')
     @yield('css')
+    <style>
+        .notif-dot {
+            display: inline-block;
+            margin-left: 6px;
+            width: 8px;
+            height: 8px;
+            background-color: red;
+            border-radius: 50%;
+            vertical-align: middle;
+        }
+    </style>
+
 @stop
 
 @section('classes_body', $layoutHelper->makeBodyClasses())
@@ -55,7 +67,70 @@
 @section('adminlte_js')
     @stack('js')
     @yield('js')
+    <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
     <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const localKey = 'has-unread-chats';
+            let hasPlayed = false;
+            let audio;
+
+            // Permitir cargar el audio después de una interacción del usuario
+            document.body.addEventListener("click", () => {
+                if (!audio) {
+                    audio = new Audio("/sounds/notification.mp3");
+                }
+            });
+
+            // Añade punto rojo según el texto visible del ítem
+            function addDotByText(menuText) {
+                const allLinks = document.querySelectorAll('.nav-link');
+                for (let link of allLinks) {
+                    const p = link.querySelector('p');
+                    if (p && p.textContent.trim().startsWith(menuText) && !p.querySelector('.notif-dot')) {
+                        const dot = document.createElement('span');
+                        dot.classList.add('notif-dot');
+                        p.appendChild(dot);
+                    }
+                }
+            }
+
+            // Elimina todos los puntos rojos
+            function removeDotsByText() {
+                const allDots = document.querySelectorAll('.notif-dot');
+                allDots.forEach(dot => dot.remove());
+            }
+
+            // Mostrar puntos si había notificaciones pendientes
+            if (localStorage.getItem(localKey) === 'true') {
+                ['Chats', 'WhatsApp', 'Gestión WhatsApp'].forEach(addDotByText);
+            }
+
+            // Inicializar Pusher
+            const pusher = new Pusher('52c212ce563c5534e98c', {
+                cluster: 'us2'
+            });
+
+            const channel = pusher.subscribe('webhooks');
+            channel.bind('App\\Events\\Webhook', function (payload) {
+                localStorage.setItem(localKey, 'true');
+                ['Chats', 'WhatsApp', 'Gestión WhatsApp'].forEach(addDotByText);
+
+                if (audio && !hasPlayed) {
+                    audio.play().catch(() => {});
+                    hasPlayed = true;
+                }
+            });
+
+            // Eliminar puntos al hacer clic en “Chats”
+            const chatsLink = document.querySelector('#menu-chats-3 a');
+            if (chatsLink) {
+                chatsLink.addEventListener('click', function () {
+                    removeDotsByText();
+                    localStorage.setItem(localKey, 'false');
+                    hasPlayed = false;
+                });
+            }
+        });
         $(document).ready(function() {
             function checkSession() {
                 $.ajax({

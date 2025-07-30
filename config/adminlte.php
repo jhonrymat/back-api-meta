@@ -346,16 +346,19 @@ return [
         [
             'text' => 'Gestión WhatsApp',
             'icon' => 'fas fa-fw fa-layer-group',
+            'id' => 'menu-gestion-1',
             'submenu' => [
                 [
                     'text' => 'WhatsApp',
                     'icon' => 'fab fa-fw fa-whatsapp',
+                    'id' => 'menu-whatsapp-2',
                     'submenu' => [
                         [
                             'text' => 'Chats',
                             'route' => 'admin.chat',
                             'can' => 'admin.chat',
                             'icon' => 'fab fa-fw fa-whatsapp',
+                            'id' => 'menu-chats-3',
                         ],
                         [
                             'text' => 'Plantillas',
