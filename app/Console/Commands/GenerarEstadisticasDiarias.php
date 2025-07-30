@@ -21,6 +21,7 @@ class GenerarEstadisticasDiarias extends Command
 
         $registros = DB::table('messages')
             ->selectRaw('DATE(created_at) as fecha, phone_id, status, distintivo, COUNT(*) as total')
+            ->where('type', 'template')
             ->whereDate('created_at', $fecha)
             ->groupBy('fecha', 'phone_id', 'status', 'distintivo')
             ->get();
