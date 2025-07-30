@@ -151,7 +151,7 @@ Route::resource(
 Route::resource('custom_fields', CustomFieldController::class);
 
 Route::get('messages-index', [MessageController::class, 'chat'])->name('admin.chat'); //mostrar todos los registroscl
-
+Route::get('message-contactos/info', [ContactoController::class, 'getByWaId']);
 //envios de errores
 Route::post('log-client-error', [ErrorLogController::class, 'store'])->middleware('can:log-client-error')->name('log-client-error');
 

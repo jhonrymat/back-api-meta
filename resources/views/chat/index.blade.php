@@ -65,7 +65,7 @@
                         style="background:#009688; min-height:65px;">
                         <i class="fas fa-arrow-left p-2 mx-3 my-1 text-white" style="font-size: 1.5rem; cursor: pointer;"
                             onclick="hideProfileSettings()"></i>
-                        <div class="text-white font-weight-bold">Profile</div>
+                        <div class="text-white font-weight-bold">Perfil</div>
                     </div>
                     <div class="d-flex flex-column" style="overflow:auto;">
                         <img alt="Profile Photo" class="img-fluid rounded-circle my-5 justify-self-center mx-auto"
@@ -150,11 +150,18 @@
 @section('css')
     <link rel="stylesheet" href="//cdn.datatables.net/responsive/2.2.1/css/responsive.bootstrap4.css">
     <link rel="stylesheet" href="{{ asset('css/chat.css') }}">
+    <style>
+        .fw-bold {
+            font-weight: 700 !important;
+        }
+    </style>
 @stop
 
 @section('js')
     <script src="//cdn.datatables.net/responsive/2.2.1/js/dataTables.responsive.min.js"></script>
     <script src="//cdn.datatables.net/responsive/2.2.1/js/responsive.bootstrap4.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
     <script src="{{ asset('js/date-utils.js') }}"></script>
 
     {{-- pusher --}}
@@ -186,32 +193,66 @@
 
             var channel = pusher.subscribe('webhooks');
             channel.bind('App\\Events\\Webhook', function(payload) {
-                // console.log(data);
                 const message = payload.message;
                 const changed = payload.change;
 
-                // Asume que `selectedChat` y `messages` son gestionados de alguna manera (p.ej., variables globales, almacenados en localStorage, etc.)
+                // 🔎 Validar búsqueda activa antes de actualizar UI
+                const search = document.getElementById('searchChatInput')?.value.trim().toLowerCase();
+
+                if (search && search.length >= 3) {
+                    const nombreMatch = message.nombre?.toLowerCase().includes(search);
+                    const waidMatch = message.wa_id?.toLowerCase().includes(search);
+
+                    // Si no coincide con la búsqueda, no actualizamos el chat visualmente
+                    if (!nombreMatch && !waidMatch) {
+                        console.log('Ignorado por filtro activo');
+                        return;
+                    }
+                }
+
+                // ✅ Si coincide o no hay búsqueda, seguimos con la lógica normal
                 if (PUSHERGLOBAL.pusherId === message.wa_id) {
                     if (changed === false) {
                         appendMessage(message);
                         scrollToBottom();
-                        highlightAndMoveChatItem(message.wa_id, message.id, message.wa_id, message.body,
-                            "{{ asset('images/user.jpg') }}", message.created_at, message.status,
-                            message.outgoing);
-                        console.log('plantilla text1')
+                        highlightAndMoveChatItem(
+                            message.wa_id,
+                            message.id,
+                            message.wa_id,
+                            message.body,
+                            "{{ asset('images/user.jpg') }}",
+                            message.created_at,
+                            message.status,
+                            message.outgoing
+                        );
+                        console.log('plantilla text1');
                     } else {
-                        console.log('plantilla text2')
+                        console.log('plantilla text2');
                         let iconHTML = getStatusIcon(message.status);
                         updateMessageStatus(message.id, iconHTML);
-                        highlightAndMoveChatItem(message.wa_id, message.id, message.wa_id, message.body,
-                            "{{ asset('images/user.jpg') }}", message.created_at, message.status,
-                            message.outgoing);
+                        highlightAndMoveChatItem(
+                            message.wa_id,
+                            message.id,
+                            message.wa_id,
+                            message.body,
+                            "{{ asset('images/user.jpg') }}",
+                            message.created_at,
+                            message.status,
+                            message.outgoing
+                        );
                     }
                 } else if (message.type === "text") {
-                    console.log('plantilla text3')
-                    highlightAndMoveChatItem(message.wa_id, message.id, message.wa_id, message.body,
-                        "{{ asset('images/user.jpg') }}", message.created_at, message.status, message
-                        .outgoing);
+                    console.log('plantilla text3');
+                    highlightAndMoveChatItem(
+                        message.wa_id,
+                        message.id,
+                        message.wa_id,
+                        message.body,
+                        "{{ asset('images/user.jpg') }}",
+                        message.created_at,
+                        message.status,
+                        message.outgoing
+                    );
                 }
             });
         });
@@ -442,23 +483,29 @@
                                     //agregar a variables globales pra reutilizar:
                                     NEXT.waId = elem.wa_id;
                                     NEXT.phoneId = elem.phone_id;
+                                    // Clase CSS condicional si tiene mensajes nuevos
+                                    const isUnread = elem.tiene_mensajes_nuevos ?
+                                        'fw-bold text-dark' : '';
+                                    const messageClass = elem.tiene_mensajes_nuevos ?
+                                        'fw-bold text-dark' : '';
 
                                     // Construir el HTML para cada elemento del chat, incluyendo un data-id
                                     //lista de chat de perfiles disponibles
                                     var chatItemHtml = `<div class="chat-list-item d-flex flex-row w-100 p-2 border-bottom" data-wa-id="${elem.wa_id || elem.telefono}" data-id="${elem.id}" onclick="generateMessageArea2('${elem.wa_id || elem.telefono}', '${idTelefono}')">
-                                                            <img src="{{ asset('images/user.jpg') }}" alt="Profile Photo" class="img-fluid rounded-circle mr-2" style="height:50px;">
-                                                            <div class="w-50">
-                                                                <div class="name">${elem.nombre}</div>
-                                                                <div class="small last-message">
-                                                                    ${(elem.outgoing === 1 && elem.body) ? getStatusIcon(elem.status) : ''}
-                                                                    ${elem.body || 'Click para ver mensajes'}
-                                                                </div>
-                                                            </div>
-                                                            <div class="flex-grow-1 text-right">
-                                                                <div class="small">${mDate(elem.updated_at).chatListFormat()}</div>
-                                                                <div class="small">${(elem.telefono)}</div>
-                                                            </div>
-                                                        </div>`;
+                                        <img src="{{ asset('images/user.jpg') }}" alt="Profile Photo" class="img-fluid rounded-circle mr-2" style="height:50px;">
+                                        <div class="w-50">
+                                            <div class="name ${isUnread}">${elem.nombre}</div>
+                                            <div class="small last-message ${messageClass}">
+                                                ${(elem.outgoing === 1 && elem.body || elem.tiene_mensajes_nuevos) ? getStatusIcon(elem.status) : ''}
+                                                ${elem.body || 'Click para ver mensajes'}
+                                            </div>
+                                        </div>
+                                        <div class="flex-grow-1 text-right">
+                                            <div class="small">${mDate(elem.updated_at).chatListFormat()}</div>
+                                            <div class="small">${(elem.telefono)}</div>
+                                        </div>
+                                    </div>`;
+
 
                                     // Agregar el HTML al div con ID 'chat-list'
                                     $("#chat-list").append(chatItemHtml);
@@ -598,7 +645,7 @@
                                         </div>
 
                                         <div class="message-content">
-                                            <div class="message sent">${elem.body}
+                                            <div class="message sent">${elem.body ? marked.parseInline(elem.body) : 'Click para ver mensajes'}
                                                 <span class="metadata">
                                                     <span class="time">${mDate(elem.created_at).getTime()}</span>
                                                     ${(elem.outgoing === 1) ? iconHTML : ""}
@@ -614,6 +661,14 @@
                             });
                             // Insertamos todos los mensajes al inicio del área de mensajes.
                             DOM.messages.innerHTML = messagesHTML + DOM.messages.innerHTML;
+                            // Eliminar negrilla del nombre y mensaje una vez se ha abierto
+                            const chatItem = document.querySelector(`.chat-list-item[data-wa-id="${waId}"]`);
+                            if (chatItem) {
+                                const nameElem = chatItem.querySelector('.name');
+                                const messageElem = chatItem.querySelector('.last-message');
+                                if (nameElem) nameElem.classList.remove('fw-bold', 'text-dark');
+                                if (messageElem) messageElem.classList.remove('fw-bold', 'text-dark');
+                            }
                             if (!nextPageUrl) {
                                 DOM.messages.scrollTo(0, DOM.messages.scrollHeight);
                             }
@@ -752,60 +807,83 @@
         function highlightAndMoveChatItem(messageWaId, messageId, nameText, lastMessageText, profilePhotoUrl, timeStamp,
             status, outgoing) {
             const chatList = document.getElementById('chat-list');
-            const chatItem = chatList.querySelector(`div.chat-list-item[data-wa-id="${messageWaId}"]`);
+            const chatItem = chatList.querySelector(`div.chat-list-item[data-wa-id="${normalizeWaId(messageWaId)}"]`);
+
+            let iconHTML = getStatusIcon(status);
+            let fecha = mDate(timeStamp).chatListFormat(); // Usamos formato consistente
 
             if (chatItem) {
-                // Mover el chatItem al principio de la lista
-                console.log("existe");
+                // 🧠 Ya existe → mover arriba y actualizar contenido
                 chatList.prepend(chatItem);
 
-                let fecha = mDate(timeStamp).getTime()
-                let iconHTML = getStatusIcon(status);
-                // Resaltar el nombre y el último mensaje en negrita
                 const name = chatItem.querySelector('.name');
                 const lastMessage = chatItem.querySelector('.last-message');
                 const horaMessage = chatItem.querySelector('.flex-grow-1 .small');
 
-                if (name && lastMessage) {
-                    name.style.fontWeight = 'bold';
-                    lastMessage.style.fontWeight = 'bold';
-                    horaMessage.style.fontWeight = 'bold';
-                    lastMessage.innerHTML = ((outgoing === 1) ? iconHTML : "") + lastMessageText;
-                    horaMessage.textContent = fecha;
-                }
 
-                addLoadMoreMessagesButton(NEXT.nextPageUrl, NEXT.waId, NEXT.phoneId, DOMNEWMESSAGE.messages);
+                if (lastMessage) {
+                    lastMessage.innerHTML = ((outgoing === 1) ? iconHTML : '') + lastMessageText;
+                    lastMessage.style.fontWeight = 'bold';
+                }
+                if (horaMessage) horaMessage.textContent = fecha;
+
+                chatItem.querySelectorAll('.name, .small').forEach(el => {
+                    el.style.fontWeight = 'bold'; // enfatizamos
+                });
 
             } else {
                 console.log("No existe");
-                // Crear un nuevo chat list item si no existe
-                const newItem = document.createElement('div');
-                let fecha = mDate(timeStamp).getTime();
-                let iconHTML = getStatusIcon(status);
-                newItem.classList.add('chat-list-item', 'd-flex', 'flex-row', 'w-100', 'p-2', 'border-bottom');
-                newItem.setAttribute('data-id', messageId);
-                newItem.setAttribute('data-wa-id', messageWaId);
-                newItem.setAttribute('onclick',
-                    `generateMessageArea2('${messageWaId}', '131481643386780')`
-                ); // Asumiendo un valor fijo para id_phone, ajusta según sea necesario
 
-                newItem.innerHTML = `
+                // Hacer petición al backend para obtener los datos del contacto
+                $.ajax({
+                    url: 'message-contactos/info',
+                    type: 'GET',
+                    data: {
+                        wa_id: messageWaId
+                    },
+                    success: function(res) {
+                        const nombre = res.success ? res.data.nombre : messageWaId;
+                        renderNewChatItem(nombre);
+                    },
+                    error: function() {
+                        renderNewChatItem(messageWaId); // fallback si falla
+                    }
+                });
+
+                function renderNewChatItem(nombreContacto) {
+                    const newItem = document.createElement('div');
+                    let fecha = mDate(timeStamp).chatListFormat();
+                    let iconHTML = getStatusIcon(status);
+
+                    newItem.classList.add('chat-list-item', 'd-flex', 'flex-row', 'w-100', 'p-2', 'border-bottom');
+                    newItem.setAttribute('data-id', messageId);
+                    newItem.setAttribute('data-wa-id', normalizeWaId(messageWaId));
+                    newItem.setAttribute('onclick', `generateMessageArea2('${messageWaId}', '${AppConfig.idTelefono}')`);
+
+                    newItem.innerHTML = `
                                             <img src="${profilePhotoUrl}" alt="Profile Photo" class="img-fluid rounded-circle mr-2" style="height:50px;">
                                             <div class="w-50">
-                                                <div class="name" style="font-weight:bold;">${nameText}</div>
-                                                <div class="small last-message" style="font-weight:bold;">${lastMessageText}</div>
+                                                <div class="name" style="font-weight:bold;">${nombreContacto}</div>
+                                                <div class="small last-message" style="font-weight:bold;">
+                                                    ${(outgoing === 1) ? iconHTML : ''}${lastMessageText}
+                                                </div>
                                             </div>
                                             <div class="flex-grow-1 text-right">
                                                 <div class="small" style="font-weight:bold;">${fecha}</div>
-                                                ${(outgoing === 1) ? iconHTML : ""}
+                                                <div class="small">${messageWaId}</div>
                                             </div>
                                         `;
 
-                // Prepend the new chat list item to the chat list
-                chatList.prepend(newItem);
+                    chatList.prepend(newItem);
 
-                addLoadMoreMessagesButton(NEXT.nextPageUrl, NEXT.waId, NEXT.phoneId, DOMNEWMESSAGE.messages);
+                    addLoadMoreMessagesButton(NEXT.nextPageUrl, NEXT.waId, NEXT.phoneId, DOMNEWMESSAGE.messages);
+                }
+            }
 
+            // ✅ Opcional: si deseas resaltar el ítem (animación ligera)
+            if (chatItem) {
+                chatItem.classList.add('bg-light');
+                setTimeout(() => chatItem.classList.remove('bg-light'), 1000);
             }
         }
     </script>
@@ -982,20 +1060,26 @@
                             NEXT.waId = elem.wa_id;
                             NEXT.phoneId = elem.phone_id;
 
+                            // Clase CSS condicional si tiene mensajes nuevos
+                            const isUnread = elem.tiene_mensajes_nuevos ?
+                                'fw-bold text-dark' : '';
+                            const messageClass = elem.tiene_mensajes_nuevos ?
+                                'fw-bold text-dark' : '';
+
                             var chatItemHtml = `<div class="chat-list-item d-flex flex-row w-100 p-2 border-bottom" data-wa-id="${elem.wa_id || elem.telefono}" data-id="${elem.id}" onclick="generateMessageArea2('${elem.wa_id || elem.telefono}', '${idTelefono}')">
-                        <img src="{{ asset('images/user.jpg') }}" alt="Profile Photo" class="img-fluid rounded-circle mr-2" style="height:50px;">
-                        <div class="w-50">
-                            <div class="name">${elem.nombre}</div>
-                            <div class="small last-message">
-                                ${(elem.outgoing === 1 && elem.body) ? iconHTML : ''}
-                                ${elem.body || 'Click para ver mensajes'}
-                            </div>
-                        </div>
-                        <div class="flex-grow-1 text-right">
-                            <div class="small">${mDate(elem.updated_at).chatListFormat()}</div>
-                            <div class="small">${elem.telefono}</div>
-                        </div>
-                    </div>`;
+                                <img src="{{ asset('images/user.jpg') }}" alt="Profile Photo" class="img-fluid rounded-circle mr-2" style="height:50px;">
+                                <div class="w-50">
+                                    <div class="name ${isUnread}">${elem.nombre}</div>
+                                    <div class="small last-message ${messageClass}">
+                                        ${(elem.outgoing === 1 && elem.body) ? iconHTML : ''}
+                                        ${elem.body || 'Click para ver mensajes'}
+                                    </div>
+                                </div>
+                                <div class="flex-grow-1 text-right">
+                                    <div class="small">${mDate(elem.updated_at).chatListFormat()}</div>
+                                    <div class="small">${elem.telefono}</div>
+                                </div>
+                            </div>`;
 
                             $("#chat-list").append(chatItemHtml);
                         });
@@ -1008,6 +1092,10 @@
                     Swal.fire('Error', 'Ocurrió un error al cargar los contactos: ' + error, 'error');
                 }
             });
+        }
+
+        function normalizeWaId(waId) {
+            return waId.replace(/\D/g, ''); // solo números
         }
     </script>
 

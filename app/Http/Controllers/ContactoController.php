@@ -378,4 +378,26 @@ class ContactoController extends Controller
         ]);
     }
 
+    public function getByWaId(Request $request)
+    {
+        $telefono = $request->wa_id;
+
+        $contacto = Contacto::where('telefono', $telefono)->first();
+
+        if (!$contacto) {
+            return response()->json(['success' => false, 'message' => 'No encontrado'], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'nombre' => $contacto->nombre,
+                'telefono' => $contacto->telefono,
+                'notas' => $contacto->notas,
+                'tiene_mensajes_nuevos' => $contacto->tiene_mensajes_nuevos,
+            ]
+        ]);
+    }
+
+
 }

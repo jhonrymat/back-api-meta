@@ -201,6 +201,11 @@ class MessageController extends Controller
             // Obtener el nombre del contacto relacionado
             $contacto = Contacto::where('telefono', $waId)->first();
 
+            if ($contacto) {
+                $contacto->tiene_mensajes_nuevos = false;
+                $contacto->save();
+            }
+
             return response()->json([
                 'success' => true,
                 'contacto' => $contacto,
@@ -216,6 +221,7 @@ class MessageController extends Controller
             ], 500);
         }
     }
+
 
 
     public function update(Request $request, Message $message)
