@@ -20,6 +20,7 @@ class CreateContactosTable extends Migration
             $table->string('correo')->nullable();
             $table->string('telefono')->unique();
             $table->text('notas')->nullable();;
+            $table->boolean('tiene_mensajes_nuevos')->default(false)->index();
             $table->timestamps();
         });
     }

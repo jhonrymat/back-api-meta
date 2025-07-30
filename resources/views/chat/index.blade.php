@@ -31,7 +31,8 @@
                             @foreach ($numeros as $numero)
                                 <option value="{{ $numero->id }}" data-id_telefono="{{ $numero->id_telefono }}"
                                     data-id_c_business="{{ $numero->aplicacion->id_c_business }}"
-                                    data-token_api="{{ $numero->aplicacion->token_api }}">
+                                    data-token_api="{{ $numero->aplicacion->token_api }}"
+                                    data-nombre="{{ $numero->nombre }}">
                                     {{ $numero->nombre }}
                                 </option>
                             @endforeach
@@ -46,28 +47,17 @@
     <div class="container-fluid" id="main-container">
         <div class="row h-100">
             <div class="col-12 col-sm-5 col-md-4 d-flex flex-column" id="chat-list-area" style="position:relative;">
-
                 <!-- titulo del perfil -->
                 <div class="row d-flex flex-row align-items-center p-2" id="navbar">
-                    <img src="{{ asset('images/user.jpg') }}" alt="Profile Photo" class="img-fluid rounded-circle mr-2"
-                        style="height:50px; cursor:pointer;" onclick="showProfileSettings()" id="display-pic">
-                    <div class="text-white font-weight-bold" id="username">Contratacion Local</p>
+                    <div class="text-white font-weight-bold" id="username">
                     </div>
-                    <div class="nav-item dropdown ml-auto">
-                        <a class="nav-link dropdown-toggle" data-toggle="dropdown" href="#" role="button"
-                            aria-haspopup="true" aria-expanded="false"><i class="fas fa-ellipsis-v text-white"></i></a>
-                        <div class="dropdown-menu dropdown-menu-right">
-                            <a class="dropdown-item" href="#">New Group</a>
-                            <a class="dropdown-item" href="#">Archived</a>
-                            <a class="dropdown-item" href="#">Starred</a>
-                            <a class="dropdown-item" href="#">Settings</a>
-                            <a class="dropdown-item" href="#">Log Out</a>
-                        </div>
+                    <div class="row px-3 py-2">
+                        <input type="text" id="searchChatInput" class="form-control" placeholder="Buscar contacto...">
                     </div>
                 </div>
 
                 <!--aqui se inserta lista de todos los chat disponibles-->
-                <div class="row" id="chat-list" style="overflow:auto; max-height: 515px;"></div>
+                <div class="row" id="chat-list" style="overflow:auto; max-height: 550px;"></div>
 
                 <!-- Profile Settings -->
                 <div class="d-flex flex-column w-100 h-100" id="profile-settings">
@@ -81,20 +71,38 @@
                         <img alt="Profile Photo" class="img-fluid rounded-circle my-5 justify-self-center mx-auto"
                             id="profile-pic">
                         <input type="file" id="profile-pic-input" class="d-none">
+
                         <div class="bg-white px-3 py-2">
-                            <div class="text-muted mb-2"><label for="input-name">Tu nombre</label></div>
-                            <input type="text" name="name" id="input-name" class="w-100 border-0 py-2 profile-input">
+                            <div class="text-muted mb-2"><label for="input-name">Nombre</label></div>
+                            <input type="text" name="name" id="input-name" class="w-100 border-0 py-2 profile-input"
+                                readonly>
                         </div>
+
+                        <div class="bg-white px-3 py-2">
+                            <div class="text-muted mb-2"><label for="input-about">Notas</label></div>
+                            <input type="text" name="about" id="input-about" class="w-100 border-0 py-2 profile-input"
+                                readonly>
+                        </div>
+
+                        <div class="bg-white px-3 py-2">
+                            <div class="text-muted mb-2">Correo</div>
+                            <div id="correoContacto" class="text-dark small"></div>
+                        </div>
+
+                        <div class="bg-white px-3 py-2">
+                            <div class="text-muted mb-2">Teléfono</div>
+                            <div id="telefonoContacto" class="text-dark small"></div>
+                        </div>
+
+                        <div class="bg-white px-3 py-2">
+                            <div class="text-muted mb-2">Fecha de creación</div>
+                            <div id="fechaContacto" class="text-dark small"></div>
+                        </div>
+
                         <div class="text-muted p-3 small">
-                            Esta informacion no se mostrará a los contactos de WhatsApp.
-                        </div>
-                        <div class="bg-white px-3 py-2">
-                            <div class="text-muted mb-2"><label for="input-about">Descripción</label></div>
-                            <input type="text" name="name" id="input-about" value=""
-                                class="w-100 border-0 py-2 profile-input">
+                            Esta información no se mostrará a los contactos de WhatsApp.
                         </div>
                     </div>
-
                 </div>
             </div>
 
@@ -108,17 +116,20 @@
                         <i class="fas fa-arrow-left p-2 mr-2 text-white" style="font-size: 1.5rem; cursor: pointer;"
                             onclick="showChatList()"></i>
                     </div>
-                    <a href="#"><img src="{{ asset('images/user.jpg') }}" alt="Profile Photo"
-                            class="img-fluid rounded-circle mr-2" style="height:50px;" id="pic"></a>
+                    <a href="#">
+                        <img src="{{ asset('images/user.jpg') }}" alt="Profile Photo"
+                            class="img-fluid rounded-circle mr-2" style="height:50px; cursor:pointer;"
+                            onclick="showProfileSettings()" id="display-pic">
+                    </a>
                     <div class="d-flex flex-column">
                         <div class="text-white font-weight-bold" id="name"></div>
                         <div class="text-white small" id="details"></div>
                     </div>
-                    <div class="d-flex flex-row align-items-center ml-auto">
+                    {{-- <div class="d-flex flex-row align-items-center ml-auto">
                         <a href="#"><i class="fas fa-search mx-3 text-white d-none d-md-block"></i></a>
                         <a href="#"><i class="fas fa-paperclip mx-3 text-white d-none d-md-block"></i></a>
                         <a href="#"><i class="fas fa-ellipsis-v mr-2 mx-sm-3 text-white"></i></a>
-                    </div>
+                    </div> --}}
                 </div>
 
                 <!-- Messages -->
@@ -149,6 +160,10 @@
     {{-- pusher --}}
     <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
     <script>
+        let nextPageUrl = null;
+        let isLoading = false;
+        let currentSearch = ''; // almacena búsqueda activa
+
         var NEXT = {
             nextPageUrl: null,
             waId: null,
@@ -258,30 +273,43 @@
             // Mostrar el modal al cargar la página
             $("#miModal").modal('show');
         });
-        var userProfilePicUrl = "{{ asset('images/user.jpg') }}";
-        const PERFIL = {
-            profileSettings: document.getElementById(
-                "profile-settings"),
-            profilePic: document.getElementById(
-                "profile-pic"),
-            inputName: document.getElementById(
-                "input-name"),
-        };
         var AppConfig = {
             idTelefono: null,
             idCBusiness: null,
             tokenApi: null
         };
 
+        var userProfilePicUrl = "{{ asset('images/user.jpg') }}"; // O ruta dinámica
+
+        const PERFIL = {
+            profileSettings: document.getElementById("profile-settings"),
+            profilePic: document.getElementById("profile-pic"),
+            inputName: document.getElementById("input-name"),
+        };
+
         let showProfileSettings = () => {
             PERFIL.profileSettings.style.left = 0;
+
+            const contacto = window.CONTACTO_ACTUAL || {};
+
+            // Imagen
             PERFIL.profilePic.src = userProfilePicUrl;
-            PERFIL.inputName.value = 'Contratacion Local';
+
+            // Nombre
+            PERFIL.inputName.value = contacto.nombre || 'Sin nombre';
+
+            // Otros datos
+            document.getElementById('input-name').value = contacto.nombre || 'Sin nombre';
+            document.getElementById('input-about').value = contacto.notas || 'Sin notas';
+            document.getElementById('correoContacto').innerText = contacto.correo || 'Sin correo';
+            document.getElementById('telefonoContacto').innerText = contacto.telefono || 'Sin número';
+            document.getElementById('fechaContacto').innerText = contacto.created_at ?
+                new Date(contacto.created_at).toLocaleDateString('es-CO') :
+                'Sin fecha';
         };
 
         let hideProfileSettings = () => {
             PERFIL.profileSettings.style.left = "-110%";
-            // DOM.username.innerHTML = user.name;
         };
     </script>
     <script>
@@ -372,27 +400,34 @@
 
                 var idCBusiness = selectedOption.data('id_c_business'); //id_telefono
                 var tokenApi = selectedOption.data('token_api');
+                var nombre = selectedOption.data('nombre');
 
                 // Almacenar en el objeto global
                 AppConfig.idTelefono = selectedOption.data('id_telefono');
                 AppConfig.idCBusiness = selectedOption.data('id_c_business');
                 AppConfig.tokenApi = selectedOption.data('token_api');
-
+                AppConfig.nombre = selectedOption.data('nombre');
 
                 if (idTelefono) {
                     Swal.fire({
                         title: 'Cargando chats...',
                         text: 'Por favor espera',
                         allowOutsideClick: false,
+                        allowEscapeKey: false, // opcional: evita cerrar con ESC
+                        showConfirmButton: false, // 🔥 oculta el botón OK
                         willOpen: () => {
                             Swal.showLoading();
                         }
                     });
+
+                    document.getElementById('username').textContent = nombre || 'WhatsApp';
+
+
                     $.ajax({
                         url: 'messages', // Cambia esto por la ruta real a tu controlador
                         type: 'GET',
                         data: {
-                            id_phone: idTelefono
+                            id_phone: idTelefono,
                         },
                         success: function(response) {
                             Swal.close(); // Cierra el SweetAlert de carga
@@ -410,14 +445,18 @@
 
                                     // Construir el HTML para cada elemento del chat, incluyendo un data-id
                                     //lista de chat de perfiles disponibles
-                                    var chatItemHtml = `<div class="chat-list-item d-flex flex-row w-100 p-2 border-bottom" data-wa-id="${elem.wa_id}" data-id="${elem.id}" onclick="generateMessageArea2('${elem.wa_id}', '${elem.phone_id}')">
+                                    var chatItemHtml = `<div class="chat-list-item d-flex flex-row w-100 p-2 border-bottom" data-wa-id="${elem.wa_id || elem.telefono}" data-id="${elem.id}" onclick="generateMessageArea2('${elem.wa_id || elem.telefono}', '${idTelefono}')">
                                                             <img src="{{ asset('images/user.jpg') }}" alt="Profile Photo" class="img-fluid rounded-circle mr-2" style="height:50px;">
                                                             <div class="w-50">
-                                                                <div class="name">${elem.wa_id}</div>
-                                                                <div class="small last-message">${(elem.outgoing === 1) ? iconHTML : ""}${elem.body}</div>
+                                                                <div class="name">${elem.nombre}</div>
+                                                                <div class="small last-message">
+                                                                    ${(elem.outgoing === 1 && elem.body) ? getStatusIcon(elem.status) : ''}
+                                                                    ${elem.body || 'Click para ver mensajes'}
+                                                                </div>
                                                             </div>
                                                             <div class="flex-grow-1 text-right">
-                                                                <div class="small">${mDate(elem.created_at).chatListFormat()}</div>
+                                                                <div class="small">${mDate(elem.updated_at).chatListFormat()}</div>
+                                                                <div class="small">${(elem.telefono)}</div>
                                                             </div>
                                                         </div>`;
 
@@ -450,13 +489,18 @@
                     title: 'Cargando mensajes...',
                     text: 'Por favor espera',
                     allowOutsideClick: false,
+                    allowEscapeKey: false, // opcional: evita cerrar con ESC
+                    showConfirmButton: false, // 🔥 oculta el botón OK
                     willOpen: () => {
                         Swal.showLoading();
                     }
                 });
+
                 // Si nextPageUrl es null, usamos la URL inicial para cargar los mensajes más recientes.
                 // Si no, usamos nextPageUrl para cargar más mensajes.
-                const url = nextPageUrl || 'messages/' + waId;
+                let url = nextPageUrl || 'messages/' + waId;
+
+
                 $.ajax({
                     url: url,
                     type: 'GET', // O 'POST' según tu implementación en el servidor
@@ -520,8 +564,12 @@
                                             "d-none").add("d-flex"));
 
                                     mClassList(DOM.messageAreaOverlay).add("d-none");
-                                    DOM.messageAreaName.innerHTML = elem.wa_id;
                                     PUSHERGLOBAL.pusherId = elem.wa_id;
+                                    window.CONTACTO_ACTUAL = response.contacto || {};
+
+                                    DOM.messageAreaName.innerHTML = response.contacto.nombre ||
+                                        elem
+                                        .wa_id;
 
                                     DOM.messageAreaDetails.innerHTML = "Ultimo mensaje: " + elem
                                         .created_at;
@@ -761,4 +809,206 @@
             }
         }
     </script>
+
+    {{-- codigo nuevo --}}
+    <script>
+        let contactPageUrl = 'messages'; // <- ajusta esta ruta a tu endpoint real
+        let isLoadingContacts = false;
+
+        function loadContacts() {
+            if (!contactPageUrl || isLoadingContacts) return;
+
+            isLoadingContacts = true;
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'info',
+                title: 'Cargando más conversaciones...',
+                showConfirmButton: false,
+                timer: 1500,
+                timerProgressBar: true
+            });
+
+            $.get(contactPageUrl, function(response) {
+                if (response.success) {
+
+                    const list = document.getElementById('chat-list');
+
+                    response.data.forEach(contacto => {
+                        const item = document.createElement('div');
+                        item.classList.add('chat-list-item', 'd-flex', 'flex-row', 'w-100', 'p-2',
+                            'border-bottom');
+                        item.setAttribute('data-wa-id', contacto.telefono);
+                        item.setAttribute('onclick',
+                            `generateMessageArea2('${contacto.telefono}', AppConfig.idTelefono)`);
+
+                        item.innerHTML = `
+                    <img src="{{ asset('images/user.jpg') }}" alt="Foto" class="img-fluid rounded-circle mr-2" style="height:50px;">
+                    <div class="w-50">
+                        <div class="name" style="${contacto.tiene_mensajes_nuevos ? 'font-weight:bold;' : ''}">
+                            ${contacto.nombre || contacto.telefono}
+                        </div>
+                        <div class="small last-message">Click para ver mensajes</div>
+                    </div>
+                    <div class="flex-grow-1 text-right">
+                        <div class="small">${new Date(contacto.updated_at).toLocaleString()}</div>
+                    </div>
+                `;
+
+                        list.appendChild(item);
+                    });
+
+                    // Actualizar URL para la siguiente página
+                    contactPageUrl = response.nextPageUrl;
+
+                    // ✅ Si ya no hay más páginas, mostrar aviso
+                    if (!contactPageUrl || response.data.length === 0) {
+                        Swal.fire({
+                            toast: true,
+                            position: 'top-end',
+                            icon: 'success',
+                            title: 'No se encontraron más resultados.',
+                            showConfirmButton: false,
+                            timer: 2000,
+                            timerProgressBar: true
+                        });
+
+                        // Opcional: remover el evento scroll si lo usas
+                        window.removeEventListener('scroll', onScrollLoadContacts);
+                    }
+
+                }
+
+                isLoadingContacts = false;
+            }).fail(() => {
+                isLoadingContacts = false;
+            });
+        }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            const chatList = document.getElementById("chat-list");
+
+            chatList.addEventListener("scroll", function() {
+                const scrollTop = chatList.scrollTop;
+                const scrollHeight = chatList.scrollHeight;
+                const offsetHeight = chatList.offsetHeight;
+
+                const search = document.getElementById('searchChatInput')?.value.trim();
+
+                // ✅ Solo permitir scroll infinito si no hay búsqueda activa o si búsqueda < 3 letras
+                if (search.length >= 3) return;
+
+                if (scrollTop + offsetHeight >= scrollHeight - 5) {
+                    loadContacts(); // aquí iría tu lógica para cargar más contactos
+                }
+            });
+        });
+
+
+        document.addEventListener("DOMContentLoaded", function() {
+            const input = document.getElementById('searchChatInput');
+            let timeout = null;
+
+            input.addEventListener('input', function() {
+                const searchTerm = input.value.trim();
+
+                clearTimeout(timeout);
+
+                // Solo buscar si hay 3 o más caracteres
+                if (searchTerm.length >= 3) {
+                    timeout = setTimeout(() => {
+                        cargarContactos(); // función AJAX que aplica el filtro
+                    }, 500); // espera 500ms después de escribir
+                }
+
+                // Si borró el texto, restaurar lista completa
+                if (searchTerm.length === 0) {
+                    cargarContactos(); // sin filtro
+                }
+            });
+        });
+
+
+
+        function cargarContactos() {
+            const idTelefono = AppConfig.idTelefono;
+            const idCBusiness = AppConfig.idCBusiness;
+            const tokenApi = AppConfig.tokenApi;
+            const nombre = AppConfig.nombre;
+
+            const search = document.getElementById('searchChatInput')?.value.trim() || '';
+
+            if (!idTelefono) return;
+
+            // Mostrar loading solo si no es búsqueda rápida
+            if (search.length < 3) {
+                Swal.fire({
+                    title: 'Cargando chats...',
+                    text: 'Por favor espera',
+                    allowOutsideClick: false,
+                    allowEscapeKey: false,
+                    showConfirmButton: false,
+                    willOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+            }
+
+            $.ajax({
+                url: 'messages',
+                type: 'GET',
+                data: {
+                    id_phone: idTelefono,
+                    search: search
+                },
+                success: function(response) {
+                    Swal.close();
+
+                    if (response.success) {
+                        $("#miModal").modal('hide');
+                        $('#chat-list').empty();
+                        $('#loadMoreMessagesBtn').remove();
+
+                        document.getElementById('username').textContent = nombre || 'WhatsApp';
+
+                        if (response.data.length === 0 && search.length >= 3) {
+                            $('#chat-list').html(
+                                `<div class="p-2 text-muted small">No se encontraron resultados.</div>`);
+                            return;
+                        }
+
+                        $.each(response.data, function(index, elem) {
+                            let iconHTML = getStatusIcon(elem.status);
+                            NEXT.waId = elem.wa_id;
+                            NEXT.phoneId = elem.phone_id;
+
+                            var chatItemHtml = `<div class="chat-list-item d-flex flex-row w-100 p-2 border-bottom" data-wa-id="${elem.wa_id || elem.telefono}" data-id="${elem.id}" onclick="generateMessageArea2('${elem.wa_id || elem.telefono}', '${idTelefono}')">
+                        <img src="{{ asset('images/user.jpg') }}" alt="Profile Photo" class="img-fluid rounded-circle mr-2" style="height:50px;">
+                        <div class="w-50">
+                            <div class="name">${elem.nombre}</div>
+                            <div class="small last-message">
+                                ${(elem.outgoing === 1 && elem.body) ? iconHTML : ''}
+                                ${elem.body || 'Click para ver mensajes'}
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 text-right">
+                            <div class="small">${mDate(elem.updated_at).chatListFormat()}</div>
+                            <div class="small">${elem.telefono}</div>
+                        </div>
+                    </div>`;
+
+                            $("#chat-list").append(chatItemHtml);
+                        });
+                    } else {
+                        Swal.fire('Error', 'No se pudieron cargar los chats.', 'error');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    Swal.close();
+                    Swal.fire('Error', 'Ocurrió un error al cargar los contactos: ' + error, 'error');
+                }
+            });
+        }
+    </script>
+
 @stop

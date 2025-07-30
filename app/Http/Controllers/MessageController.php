@@ -67,35 +67,50 @@ class MessageController extends Controller
     }
     public function index(Request $request)
     {
-        $input = $request->all();
-        $phone_id = $input['id_phone'];
+        $perPage = 20;
 
-        try {
-            $messages = DB::table('messages', 'm')
-                ->where('m.phone_id', $phone_id) // Filtrar por el valor de phone_id
-                ->where('m.created_at', '>', Carbon::now()->subDay()) // Filtrar por las últimas 24 horas
-                // ->where('m.outgoing', '=', '0') // Filtrar por las últimas 24 horas
-                ->whereRaw('m.id IN (SELECT MAX(id) FROM messages m2 GROUP BY wa_id)')
-                ->orderByDesc('m.id')
-                ->limit(100) // Limitar a los 100 primeros registros
-                ->get();
+        $query = Contacto::query()
+            ->orderByDesc('tiene_mensajes_nuevos')
+            ->orderByDesc('updated_at');
 
-            return response()->json([
-                'success' => true,
-                'data' => $messages,
-            ], 200);
-        } catch (Exception $e) {
-            Log::error('Error al obtener chats: ' . json_encode($e->getMessage()));
+        // 🔍 Agregar filtro si viene el parámetro `search`
+        if ($request->filled('search')) {
+            $search = $request->search;
 
-            // Utilizar el mensaje de la excepción o un mensaje predeterminado
-            $errorMessage = isset($e->getMessage()['message']) ? $e->getMessage()['message'] : 'Error interno del servidor';
-
-            return response()->json([
-                'success' => false,
-                'error' => $errorMessage,
-            ], 500);
+            $query->where(function ($q) use ($search) {
+                $q->where('nombre', 'like', "%{$search}%")
+                    ->orWhere('telefono', 'like', "%{$search}%");
+            });
         }
+
+        $paginator = $query->paginate($perPage);
+
+        $contactos = $paginator->getCollection()->map(function ($contacto) {
+            $data = $contacto->toArray();
+
+            if ($contacto->tiene_mensajes_nuevos) {
+                $ultimo = $contacto->messages()->latest('id')->first();
+                if ($ultimo) {
+                    $data['body'] = $ultimo->body;
+                    $data['wa_id'] = $ultimo->wa_id;
+                    $data['status'] = $ultimo->status;
+                    $data['outgoing'] = $ultimo->outgoing;
+                    $data['created_at'] = $ultimo->created_at;
+                }
+            }
+
+            return $data;
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => $contactos,
+            'nextPageUrl' => $paginator->nextPageUrl(),
+        ]);
     }
+
+
+
 
     /**
      * Store a newly created resource in storage.
@@ -127,6 +142,8 @@ class MessageController extends Controller
             $message->caption = '';
             $message->data = '';
             $message->save();
+
+
 
             return response()->json([
                 'success' => true,
@@ -181,8 +198,12 @@ class MessageController extends Controller
                 });
             });
 
+            // Obtener el nombre del contacto relacionado
+            $contacto = Contacto::where('telefono', $waId)->first();
+
             return response()->json([
                 'success' => true,
+                'contacto' => $contacto,
                 'data' => $grouped,
                 'nextPageUrl' => $messagesQuery->nextPageUrl(), // Proporciona la URL para cargar la próxima página de mensajes
                 'prevPageUrl' => $messagesQuery->previousPageUrl(), // Proporciona la URL para la página anterior (si la necesitas)
