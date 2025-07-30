@@ -61,6 +61,7 @@ class MessageController extends Controller
         $numeros = $user->numeros()->with('aplicacion')->get();
 
 
+
         return view('chat/index', [
             'numeros' => $numeros
         ]);
@@ -69,7 +70,10 @@ class MessageController extends Controller
     {
         $perPage = 20;
 
-        $query = Contacto::query()
+        $user = auth()->user(); // Obtener usuario autenticado
+
+        // Base query: contactos del usuario logeado
+        $query = $user->contactos()
             ->orderByDesc('tiene_mensajes_nuevos')
             ->orderByDesc('updated_at');
 
@@ -83,6 +87,7 @@ class MessageController extends Controller
             });
         }
 
+        // Paginación
         $paginator = $query->paginate($perPage);
 
         $contactos = $paginator->getCollection()->map(function ($contacto) {
@@ -108,6 +113,7 @@ class MessageController extends Controller
             'nextPageUrl' => $paginator->nextPageUrl(),
         ]);
     }
+
 
 
 

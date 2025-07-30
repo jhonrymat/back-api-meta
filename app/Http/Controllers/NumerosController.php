@@ -59,6 +59,10 @@ class NumerosController extends Controller
             'calidad' => $request->calidad,
         ]);
 
+        // Relacionar con el usuario autenticado
+        $user = Auth::user(); // o User::find($request->user_id) si el usuario viene por parámetro
+        $user->numeros()->attach($numero->id);
+
         return response()->json(['success' => 'Número creado con éxito.']);
 
 

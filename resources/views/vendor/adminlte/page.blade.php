@@ -112,14 +112,29 @@
 
             const channel = pusher.subscribe('webhooks');
             channel.bind('App\\Events\\Webhook', function (payload) {
-                localStorage.setItem(localKey, 'true');
-                ['Chats', 'WhatsApp', 'Gestión WhatsApp'].forEach(addDotByText);
+                const waId = payload.message.wa_id;
 
-                if (audio && !hasPlayed) {
-                    audio.play().catch(() => {});
-                    hasPlayed = true;
-                }
+                // Verificar si el contacto pertenece al usuario logeado
+                fetch(`verificar-contacto/${waId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`, // si usas token
+                        'Accept': 'application/json',
+                    },
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.pertenece) {
+                        localStorage.setItem('has-unread-chats', 'true');
+                        ['Chats', 'WhatsApp', 'Gestión WhatsApp'].forEach(addDotByText);
+
+                        if (audio && !hasPlayed) {
+                            audio.play().catch(() => {});
+                            hasPlayed = true;
+                        }
+                    }
+                });
             });
+
 
             // Eliminar puntos al hacer clic en “Chats”
             const chatsLink = document.querySelector('#menu-chats-3 a');

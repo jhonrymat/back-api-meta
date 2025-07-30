@@ -256,3 +256,19 @@ Route::post('ask-bot-embedded', [BotIA::class, 'askBotForEmbed'])->middleware('c
 Route::post('upload-image', [BotIA::class, 'uploadImage'])->middleware('cors.custom')->withoutMiddleware('auth');
 // borrar hilo deleteThread
 Route::delete('delete-thread', [BotIA::class, 'deleteThread'])->name('deleteThread');
+
+// routes/api.php o web.php
+Route::get('verificar-contacto/{wa_id}', function ($wa_id) {
+    $user = auth()->user(); // o Auth::user()
+
+    $contacto = \App\Models\Contacto::where('telefono', $wa_id)->first();
+
+    if (!$contacto) {
+        return response()->json(['pertenece' => false]);
+    }
+
+    $pertenece = $contacto->users()->where('user_id', $user->id)->exists();
+
+    return response()->json(['pertenece' => $pertenece]);
+})->middleware('auth:sanctum'); // o tu middleware de autenticación
+

@@ -160,7 +160,7 @@
 @section('js')
     <script src="//cdn.datatables.net/responsive/2.2.1/js/dataTables.responsive.min.js"></script>
     <script src="//cdn.datatables.net/responsive/2.2.1/js/responsive.bootstrap4.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script> 
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
     <script src="{{ asset('js/date-utils.js') }}"></script>
 
@@ -184,37 +184,141 @@
             messages: document.getElementById("messages")
         };
         document.addEventListener("DOMContentLoaded", function() {
+            const contactoCache = {}; // ← aquí se guarda el resultado por wa_id
+            let audio, hasPlayed = false;
 
-            // Pusher.logToConsole = true;
-
-            var pusher = new Pusher('52c212ce563c5534e98c', { // Usa tu clave real aquí
-                cluster: 'us2' // Usa tu cluster real aquí
+            // Permitir cargar audio al primer clic del usuario
+            document.body.addEventListener("click", () => {
+                if (!audio) {
+                    audio = new Audio("/sounds/notification.mp3");
+                }
             });
 
-            var channel = pusher.subscribe('webhooks');
+            const localKey = 'has-unread-chats';
+
+            // Funciones de UI
+            function addDotByText(menuText) {
+                document.querySelectorAll('.nav-link').forEach(link => {
+                    const p = link.querySelector('p');
+                    if (p && p.textContent.trim().startsWith(menuText) && !p.querySelector('.notif-dot')) {
+                        const dot = document.createElement('span');
+                        dot.classList.add('notif-dot');
+                        p.appendChild(dot);
+                    }
+                });
+            }
+
+            function removeDotsByText() {
+                document.querySelectorAll('.notif-dot').forEach(dot => dot.remove());
+            }
+
+            // Restaurar punto si había pendientes
+            if (localStorage.getItem(localKey) === 'true') {
+                ['Chats', 'WhatsApp', 'Gestión WhatsApp'].forEach(addDotByText);
+            }
+
+            const chatsLink = document.querySelector('#menu-chats-3 a');
+            if (chatsLink) {
+                chatsLink.addEventListener('click', () => {
+                    removeDotsByText();
+                    localStorage.setItem(localKey, 'false');
+                    hasPlayed = false;
+                });
+            }
+
+            // Función para verificar si el contacto pertenece al usuario
+            function verificarPertenece(waId) {
+                if (contactoCache.hasOwnProperty(waId)) {
+                    return Promise.resolve(contactoCache[waId]);
+                }
+
+                return fetch(`verificar-contacto/${waId}`, {
+                        headers: {
+                            'Accept': 'application/json',
+                            // Si usas token en LocalStorage:
+                            // 'Authorization': `Bearer ${localStorage.getItem('token')}`
+                        },
+                    })
+                    .then(res => {
+                        if (!res.ok) throw new Error("No se pudo verificar el contacto");
+                        return res.json();
+                    })
+                    .then(data => {
+                        contactoCache[waId] = data.pertenece;
+                        return data.pertenece;
+                    })
+                    .catch(err => {
+                        console.error("Error al verificar contacto:", err);
+                        return false;
+                    });
+            }
+
+            // Inicializar Pusher
+            const pusher = new Pusher('52c212ce563c5534e98c', {
+                cluster: 'us2'
+            });
+
+            const channel = pusher.subscribe('webhooks');
             channel.bind('App\\Events\\Webhook', function(payload) {
                 const message = payload.message;
                 const changed = payload.change;
 
-                // 🔎 Validar búsqueda activa antes de actualizar UI
+                // ❌ Si el mensaje es de tipo 'actualización' (change === true), ignorarlo
+                if (changed === true) {
+                    return;
+                }
+
                 const search = document.getElementById('searchChatInput')?.value.trim().toLowerCase();
 
+                // Validar búsqueda activa
                 if (search && search.length >= 3) {
                     const nombreMatch = message.nombre?.toLowerCase().includes(search);
                     const waidMatch = message.wa_id?.toLowerCase().includes(search);
-
-                    // Si no coincide con la búsqueda, no actualizamos el chat visualmente
-                    if (!nombreMatch && !waidMatch) {
-                        console.log('Ignorado por filtro activo');
-                        return;
-                    }
+                    if (!nombreMatch && !waidMatch) return;
                 }
 
-                // ✅ Si coincide o no hay búsqueda, seguimos con la lógica normal
-                if (PUSHERGLOBAL.pusherId === message.wa_id) {
-                    if (changed === false) {
-                        appendMessage(message);
-                        scrollToBottom();
+                // Verifica si el contacto le pertenece al usuario antes de mostrar
+                verificarPertenece(message.wa_id).then(pertenece => {
+                    if (!pertenece) return;
+
+                    localStorage.setItem(localKey, 'true');
+                    ['Chats', 'WhatsApp', 'Gestión WhatsApp'].forEach(addDotByText);
+
+                    if (audio && !hasPlayed) {
+                        audio.play().catch(() => {});
+                        hasPlayed = true;
+                    }
+
+                    // Lógica de actualización del chat
+                    if (PUSHERGLOBAL.pusherId === message.wa_id) {
+                        if (changed === false) {
+                            appendMessage(message);
+                            scrollToBottom();
+                            highlightAndMoveChatItem(
+                                message.wa_id,
+                                message.id,
+                                message.wa_id,
+                                message.body,
+                                "{{ asset('images/user.jpg') }}",
+                                message.created_at,
+                                message.status,
+                                message.outgoing
+                            );
+                        } else {
+                            let iconHTML = getStatusIcon(message.status);
+                            updateMessageStatus(message.id, iconHTML);
+                            highlightAndMoveChatItem(
+                                message.wa_id,
+                                message.id,
+                                message.wa_id,
+                                message.body,
+                                "{{ asset('images/user.jpg') }}",
+                                message.created_at,
+                                message.status,
+                                message.outgoing
+                            );
+                        }
+                    } else if (message.type === "text") {
                         highlightAndMoveChatItem(
                             message.wa_id,
                             message.id,
@@ -225,37 +329,12 @@
                             message.status,
                             message.outgoing
                         );
-                        console.log('plantilla text1');
-                    } else {
-                        console.log('plantilla text2');
-                        let iconHTML = getStatusIcon(message.status);
-                        updateMessageStatus(message.id, iconHTML);
-                        highlightAndMoveChatItem(
-                            message.wa_id,
-                            message.id,
-                            message.wa_id,
-                            message.body,
-                            "{{ asset('images/user.jpg') }}",
-                            message.created_at,
-                            message.status,
-                            message.outgoing
-                        );
                     }
-                } else if (message.type === "text") {
-                    console.log('plantilla text3');
-                    highlightAndMoveChatItem(
-                        message.wa_id,
-                        message.id,
-                        message.wa_id,
-                        message.body,
-                        "{{ asset('images/user.jpg') }}",
-                        message.created_at,
-                        message.status,
-                        message.outgoing
-                    );
-                }
+                });
             });
         });
+
+
 
         function appendMessage(message) {
 
