@@ -237,6 +237,7 @@
                             'Accept': 'application/json',
                             // Si usas token en LocalStorage:
                             // 'Authorization': `Bearer ${localStorage.getItem('token')}`
+                            
                         },
                     })
                     .then(res => {
