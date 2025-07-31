@@ -69,9 +69,8 @@
     @yield('js')
     <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
     <script>
-        document.addEventListener("DOMContentLoaded", function () {
+        document.addEventListener("DOMContentLoaded", function() {
             const localKey = 'has-unread-chats';
-            let hasPlayed = false;
             let audio;
 
             // Permitir cargar el audio después de una interacción del usuario
@@ -111,35 +110,47 @@
             });
 
             const channel = pusher.subscribe('webhooks');
-            channel.bind('App\\Events\\Webhook', function (payload) {
+            channel.bind('App\\Events\\Webhook', function(payload) {
                 const waId = payload.message.wa_id;
+                const changed = payload.change;
+                const type = payload.message.type;
+
+                // ❌ Si el mensaje es de tipo 'actualización' (change === true), ignorarlo
+                if (changed === true || type === 'ia' || type === 'template') {
+                    return;
+                }
 
                 // Verificar si el contacto pertenece al usuario logeado
                 fetch(`verificar-contacto/${waId}`, {
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`, // si usas token
-                        'Accept': 'application/json',
-                    },
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.pertenece) {
-                        localStorage.setItem('has-unread-chats', 'true');
-                        ['Chats', 'WhatsApp', 'Gestión WhatsApp'].forEach(addDotByText);
+                        headers: {
+                            'Authorization': `Bearer ${localStorage.getItem('token')}`, // si usas token
+                            'Accept': 'application/json',
+                        },
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.pertenece && changed == false) {
+                            localStorage.setItem('has-unread-chats', 'true');
+                            ['Chats', 'WhatsApp', 'Gestión WhatsApp'].forEach(addDotByText);
 
-                        if (audio && !hasPlayed) {
-                            audio.play().catch(() => {});
-                            hasPlayed = true;
+                            // 🔔 Reproduce siempre que llegue un nuevo mensaje y no sea actualización
+                            if (audio && changed === false && PUSHERGLOBAL.pusherId !== waId) {
+                                audio.play().catch(() => {});
+                            }
+                        } else {
+                            // Si no pertenece, eliminar puntos de los menús
+                            removeDotsByText();
+                            localStorage.setItem(localKey, 'false');
+                            hasPlayed = false;
                         }
-                    }
-                });
+                    });
             });
 
 
             // Eliminar puntos al hacer clic en “Chats”
             const chatsLink = document.querySelector('#menu-chats-3 a');
             if (chatsLink) {
-                chatsLink.addEventListener('click', function () {
+                chatsLink.addEventListener('click', function() {
                     removeDotsByText();
                     localStorage.setItem(localKey, 'false');
                     hasPlayed = false;
@@ -149,7 +160,7 @@
         $(document).ready(function() {
             function checkSession() {
                 $.ajax({
-                    url: '{{ url("/check-session") }}',
+                    url: '{{ url('/check-session') }}',
                     method: 'GET',
                     success: function(response) {
                         if (!response.is_logged_in) {

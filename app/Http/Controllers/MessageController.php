@@ -101,6 +101,7 @@ class MessageController extends Controller
                     $data['status'] = $ultimo->status;
                     $data['outgoing'] = $ultimo->outgoing;
                     $data['created_at'] = $ultimo->created_at;
+                    $data['type'] = $ultimo->type;
                 }
             }
 

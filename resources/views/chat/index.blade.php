@@ -184,142 +184,58 @@
             messages: document.getElementById("messages")
         };
         document.addEventListener("DOMContentLoaded", function() {
-            const contactoCache = {}; // ← aquí se guarda el resultado por wa_id
-            let audio, hasPlayed = false;
 
-            // Permitir cargar audio al primer clic del usuario
-            document.body.addEventListener("click", () => {
-                if (!audio) {
-                    audio = new Audio("/sounds/notification.mp3");
-                }
+            //Pusher.logToConsole = true;
+
+            var pusher = new Pusher('52c212ce563c5534e98c', { // Usa tu clave real aquí
+                cluster: 'us2' // Usa tu cluster real aquí
             });
 
-            const localKey = 'has-unread-chats';
-
-            // Funciones de UI
-            function addDotByText(menuText) {
-                document.querySelectorAll('.nav-link').forEach(link => {
-                    const p = link.querySelector('p');
-                    if (p && p.textContent.trim().startsWith(menuText) && !p.querySelector('.notif-dot')) {
-                        const dot = document.createElement('span');
-                        dot.classList.add('notif-dot');
-                        p.appendChild(dot);
-                    }
-                });
-            }
-
-            function removeDotsByText() {
-                document.querySelectorAll('.notif-dot').forEach(dot => dot.remove());
-            }
-
-            // Restaurar punto si había pendientes
-            if (localStorage.getItem(localKey) === 'true') {
-                ['Chats', 'WhatsApp', 'Gestión WhatsApp'].forEach(addDotByText);
-            }
-
-            const chatsLink = document.querySelector('#menu-chats-3 a');
-            if (chatsLink) {
-                chatsLink.addEventListener('click', () => {
-                    removeDotsByText();
-                    localStorage.setItem(localKey, 'false');
-                    hasPlayed = false;
-                });
-            }
-
-            // Función para verificar si el contacto pertenece al usuario
-            function verificarPertenece(waId) {
-                if (contactoCache.hasOwnProperty(waId)) {
-                    return Promise.resolve(contactoCache[waId]);
-                }
-
-                return fetch(`verificar-contacto/${waId}`, {
-                        headers: {
-                            'Accept': 'application/json',
-                            // Si usas token en LocalStorage:
-                            // 'Authorization': `Bearer ${localStorage.getItem('token')}`
-                            
-                        },
-                    })
-                    .then(res => {
-                        if (!res.ok) throw new Error("No se pudo verificar el contacto");
-                        return res.json();
-                    })
-                    .then(data => {
-                        contactoCache[waId] = data.pertenece;
-                        return data.pertenece;
-                    })
-                    .catch(err => {
-                        console.error("Error al verificar contacto:", err);
-                        return false;
-                    });
-            }
-
-            // Inicializar Pusher
-            const pusher = new Pusher('52c212ce563c5534e98c', {
-                cluster: 'us2'
-            });
-
-            const channel = pusher.subscribe('webhooks');
+            var channel = pusher.subscribe('webhooks');
             channel.bind('App\\Events\\Webhook', function(payload) {
                 const message = payload.message;
                 const changed = payload.change;
+                const type = payload.message.type;
 
-                // ❌ Si el mensaje es de tipo 'actualización' (change === true), ignorarlo
-                if (changed === true) {
+                 if (type === 'template') {
                     return;
                 }
 
+
+                // 🔎 Validar búsqueda activa antes de actualizar UI
                 const search = document.getElementById('searchChatInput')?.value.trim().toLowerCase();
 
-                // Validar búsqueda activa
                 if (search && search.length >= 3) {
                     const nombreMatch = message.nombre?.toLowerCase().includes(search);
                     const waidMatch = message.wa_id?.toLowerCase().includes(search);
-                    if (!nombreMatch && !waidMatch) return;
+
+                    // Si no coincide con la búsqueda, no actualizamos el chat visualmente
+                    if (!nombreMatch && !waidMatch) {
+                        console.log('Ignorado por filtro activo');
+                        return;
+                    }
                 }
 
-                // Verifica si el contacto le pertenece al usuario antes de mostrar
-                verificarPertenece(message.wa_id).then(pertenece => {
-                    if (!pertenece) return;
-
-                    localStorage.setItem(localKey, 'true');
-                    ['Chats', 'WhatsApp', 'Gestión WhatsApp'].forEach(addDotByText);
-
-                    if (audio && !hasPlayed) {
-                        audio.play().catch(() => {});
-                        hasPlayed = true;
-                    }
-
-                    // Lógica de actualización del chat
-                    if (PUSHERGLOBAL.pusherId === message.wa_id) {
-                        if (changed === false) {
-                            appendMessage(message);
-                            scrollToBottom();
-                            highlightAndMoveChatItem(
-                                message.wa_id,
-                                message.id,
-                                message.wa_id,
-                                message.body,
-                                "{{ asset('images/user.jpg') }}",
-                                message.created_at,
-                                message.status,
-                                message.outgoing
-                            );
-                        } else {
-                            let iconHTML = getStatusIcon(message.status);
-                            updateMessageStatus(message.id, iconHTML);
-                            highlightAndMoveChatItem(
-                                message.wa_id,
-                                message.id,
-                                message.wa_id,
-                                message.body,
-                                "{{ asset('images/user.jpg') }}",
-                                message.created_at,
-                                message.status,
-                                message.outgoing
-                            );
-                        }
-                    } else if (message.type === "text") {
+                // ✅ Si coincide o no hay búsqueda, seguimos con la lógica normal
+                if (PUSHERGLOBAL.pusherId === message.wa_id) {
+                    if (changed === false || changed === "false" || changed === 0 || changed === "0") {
+                        appendMessage(message);
+                        scrollToBottom();
+                        highlightAndMoveChatItem(
+                            message.wa_id,
+                            message.id,
+                            message.wa_id,
+                            message.body,
+                            "{{ asset('images/user.jpg') }}",
+                            message.created_at,
+                            message.status,
+                            message.outgoing
+                        );
+                        console.log('plantilla text1');
+                    } else {
+                        console.log('plantilla text2');
+                        let iconHTML = getStatusIcon(message.status);
+                        updateMessageStatus(message.id, iconHTML);
                         highlightAndMoveChatItem(
                             message.wa_id,
                             message.id,
@@ -331,33 +247,106 @@
                             message.outgoing
                         );
                     }
-                });
+                } else if (message.type === "text" || message.type === "ia") {
+                    console.log('plantilla text3');
+                    highlightAndMoveChatItem(
+                        message.wa_id,
+                        message.id,
+                        message.wa_id,
+                        message.body,
+                        "{{ asset('images/user.jpg') }}",
+                        message.created_at,
+                        message.status,
+                        message.outgoing
+                    );
+                }
             });
         });
 
 
 
         function appendMessage(message) {
+            // const iconHTML = '<i class="fas fa-check-double text-primary ps-2"></i>';
+            let iconHTML = getStatusIcon(message.status);
+            const fechaFormateada = formatISODateToCustomString(message.created_at);
 
-            fechaFormateada = formatISODateToCustomString(message.created_at);
+            const renderBody = (() => {
+                const url = message.body;
+                const escapeAttr = (s) =>
+                    String(s || '').replace(/[&<>"']/g, (c) =>
+                        ({
+                            '&': '&amp;',
+                            '<': '&lt;',
+                            '>': '&gt;',
+                            '"': '&quot;',
+                            '\'': '&#39;'
+                        } [c])
+                    );
+
+                const fileName = (u) => {
+                    try {
+                        const p = new URL(u);
+                        const last = p.pathname.split('/').pop();
+                        return last && last !== '' ? last : u;
+                    } catch {
+                        return u || '';
+                    }
+                };
+
+                switch (message.type) {
+                    case 'image':
+                    case 'sticker':
+                        return url ?
+                            `<img src="${escapeAttr(url)}" alt="Imagen" class="msg-media img">` :
+                            '🖼️ <em>[Imagen]</em>';
+
+                    case 'video':
+                        return url ?
+                            `<video src="${escapeAttr(url)}" controls class="msg-media video"></video>` :
+                            '🎥 <em>[Video]</em>';
+
+                    case 'audio':
+                        return url ?
+                            `🔊 <em>[Audio]</em> <a href="${escapeAttr(url)}" target="_blank">${fileName(url)}</a>` :
+                            '🔊 <em>[Audio]</em>';
+
+                    case 'document':
+                        return url ?
+                            `📄 <a href="${escapeAttr(url)}" target="_blank">${fileName(url)}</a>` :
+                            '📄 <em>[Documento]</em>';
+
+                    case 'location':
+                        return url ?
+                            `📍 <a href="${escapeAttr(url)}" target="_blank">Ver ubicación</a>` :
+                            '📍 <em>[Ubicación]</em>';
+
+                    case 'contact':
+                        return '👤 <em>[Contacto]</em>';
+
+                    case 'text':
+                    default:
+                        return message.body ? marked.parseInline(message.body) : 'Click para ver mensajes';
+                }
+            })();
 
             DOMNEWMESSAGE.messages.innerHTML += `
-                    <div data-id-message="${message.id}" class="align-self-${message.outgoing ? "end self" : "start"} p-1 my-1 mx-3 rounded bg-white shadow-sm message-item">
-                        <div class="options">
-                            <a href="#"><i class="fas fa-angle-down text-muted px-2"></i></a>
-                        </div>
-                        <div class="message-content">
-                            <div class="message sent">${message.body}
-                                <span class="metadata">
-                                    <span class="time">${mDate(message.created_at).getTime()}</span>
-                                    ${(message.outgoing === 1) ? iconHTML : ""}
-                                </span>
+                        <div data-id-message="${message.id}" class="align-self-${message.outgoing ? "end self" : "start"} p-1 my-1 mx-3 rounded bg-white shadow-sm message-item">
+                            <div class="options">
+                                <a href="#"><i class="fas fa-angle-down text-muted px-2"></i></a>
+                            </div>
+                            <div class="message-content">
+                                <div class="message sent">
+                                    ${renderBody}
+                                    <span class="metadata">
+                                        <span class="time">${mDate(message.created_at).getTime()}</span>
+                                        ${(message.outgoing === 1) ? iconHTML : ""}
+                                    </span>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                `;
-
+                    `;
         }
+
 
         function scrollToBottom() {
             // Asegurarte de que el contenedor de mensajes se desplaza hacia abajo para mostrar el último mensaje
@@ -397,7 +386,9 @@
         var AppConfig = {
             idTelefono: null,
             idCBusiness: null,
-            tokenApi: null
+            tokenApi: null,
+            nombre: null,
+            celular: null
         };
 
         var userProfilePicUrl = "{{ asset('images/user.jpg') }}"; // O ruta dinámica
@@ -451,17 +442,16 @@
             var idTelefono = AppConfig.idTelefono; //id_telefono
             var idCBusiness = AppConfig.idCBusiness; //id_telefono
             var tokenApi = AppConfig.tokenApi;
+            var celular = AppConfig.celular; // celular global
 
-            // Obtén el valor del input
-            var nameText = document.getElementById('name');
-            var waId = nameText.innerText;
+
             var message = document.getElementById('input').value;
             if (message) {
                 $.ajax({
                     url: 'messages/',
                     type: 'POST', // O 'POST' según tu implementación en el servidor
                     data: {
-                        wa_id: waId,
+                        wa_id: celular,
                         id_phone: idTelefono,
                         token_api: tokenApi,
                         body: message
@@ -551,6 +541,7 @@
                             id_phone: idTelefono,
                         },
                         success: function(response) {
+                            contactPageUrl = response.nextPageUrl; // <-- AQUI ACTUALIZAS LA URL
                             Swal.close(); // Cierra el SweetAlert de carga
                             if (response.success) {
                                 $("#miModal").modal('hide');
@@ -576,8 +567,31 @@
                                         <div class="w-50">
                                             <div class="name ${isUnread}">${elem.nombre}</div>
                                             <div class="small last-message ${messageClass}">
-                                                ${(elem.outgoing === 1 && elem.body || elem.tiene_mensajes_nuevos) ? getStatusIcon(elem.status) : ''}
-                                                ${elem.body || 'Click para ver mensajes'}
+                                                ${(elem.outgoing === 1 && (elem.body || elem.tiene_mensajes_nuevos)) ? getStatusIcon(elem.status) : ''}
+                                                ${(() => {
+                                                    switch (elem.type) {
+                                                        case 'audio':
+                                                            return '🔊 <em>[Audio]</em>';
+                                                        case 'image':
+                                                            return '🖼️ <em>[Imagen]</em>';
+                                                        case 'video':
+                                                            return '🎥 <em>[Video]</em>';
+                                                        case 'document':
+                                                            return '📄 <em>[Documento]</em>';
+                                                        case 'sticker':
+                                                            return '🌟 <em>[Sticker]</em>';
+                                                        case 'location':
+                                                            return '📍 <em>[Ubicación]</em>';
+                                                        case 'contact':
+                                                            return '👤 <em>[Contacto]</em>';
+                                                        case 'other':
+                                                            return '👤 <em>[Otro]</em>';
+                                                        case 'text':
+                                                            return elem.body || 'Click para ver mensajes';
+                                                        default:
+                                                            return elem.body || 'Click para ver mensajes';
+                                                    }
+                                                })()}
                                             </div>
                                         </div>
                                         <div class="flex-grow-1 text-right">
@@ -717,7 +731,8 @@
                                     // Si necesitas actualizar la UI con datos específicos de 'chat', asegúrate de hacerlo correctamente aquí.
                                     // Por ejemplo, si quieres actualizar el nombre y la imagen en el área de mensajes basado en 'chat'.
                                     //AQUI SE CARGAN TODOS LOS CHAT DISPONIBLES DEL PERFIL SELECIONADO
-
+                                    // celular global
+                                    AppConfig.celular = elem.wa_id;
                                     let messageHTML = `
                                     <div data-id-message="${elem.id}" class="align-self-${elem.outgoing === 1 ? "end self" : "start"} p-1 my-1 mx-3 rounded bg-white shadow-sm message-item">
                                         <div class="options">
@@ -725,12 +740,37 @@
                                         </div>
 
                                         <div class="message-content">
-                                            <div class="message sent">${elem.body ? marked.parseInline(elem.body) : 'Click para ver mensajes'}
+                                            <div class="message sent">
+                                                ${(() => {
+                                                    switch (elem.type) {
+                                                        case 'image':
+                                                            return `<img src="${elem.body}" alt="Imagen" style="max-width: 200px; border-radius: 8px;" />`;
+
+                                                        case 'audio':
+                                                            return `<audio controls src="${elem.body}" style="max-width: 200px;">
+                                                                                Tu navegador no soporta el audio.
+                                                                            </audio>`;
+
+                                                        case 'video':
+                                                            return `<video controls src="${elem.body}" style="max-width: 200px; border-radius: 8px;">
+                                                                                Tu navegador no soporta el video.
+                                                                            </video>`;
+
+                                                        case 'document':
+                                                            return `<a href="${elem.body}" target="_blank" style="color: blue; text-decoration: underline;">
+                                                                                📄 Descargar Documento
+                                                                            </a>`;
+
+                                                        default: // texto u otros
+                                                            return elem.body ? marked.parseInline(elem.body) : 'Click para ver mensajes';
+                                                    }
+                                                })()}
                                                 <span class="metadata">
                                                     <span class="time">${mDate(elem.created_at).getTime()}</span>
                                                     ${(elem.outgoing === 1) ? iconHTML : ""}
                                                 </span>
                                             </div>
+
                                         </div>
                                     </div>
                                     `;
@@ -889,6 +929,8 @@
             const chatList = document.getElementById('chat-list');
             const chatItem = chatList.querySelector(`div.chat-list-item[data-wa-id="${normalizeWaId(messageWaId)}"]`);
 
+
+
             let iconHTML = getStatusIcon(status);
             let fecha = mDate(timeStamp).chatListFormat(); // Usamos formato consistente
 
@@ -934,6 +976,8 @@
                     const newItem = document.createElement('div');
                     let fecha = mDate(timeStamp).chatListFormat();
                     let iconHTML = getStatusIcon(status);
+
+                    console.log('🛠️ Creando nuevo item para', messageWaId);
 
                     newItem.classList.add('chat-list-item', 'd-flex', 'flex-row', 'w-100', 'p-2', 'border-bottom');
                     newItem.setAttribute('data-id', messageId);
