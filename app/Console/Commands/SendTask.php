@@ -11,41 +11,17 @@ use App\Models\TareaProgramada;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Http;
 
 class SendTask extends Command
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
     protected $signature = 'send:task {--scheduled}';
-
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
-
     protected $description = 'Envios masivos de mensajes programados';
 
-    /**
-     * Create a new command instance.
-     *
-     * @return void
-     */
     public function __construct()
     {
         parent::__construct();
     }
 
-    /**
-     * Execute the console command.
-     *
-     * @return int
-     */
     public function handle()
     {
         $this->info('Ejecutando tarea programada...');
@@ -54,6 +30,9 @@ class SendTask extends Command
             $tareasPendientes = TareaProgramada::where('fecha_programada', '<=', now())
                 ->where('status', 'pendiente')
                 ->get();
+
+            // ⚡️ Optimización: cargar campos personalizados una sola vez
+            $customFields = CustomField::pluck('id', 'name')->toArray();
 
             foreach ($tareasPendientes as $tarea) {
                 $nombreArchivo = basename($tarea->numeros);
@@ -72,9 +51,36 @@ class SendTask extends Command
                                 $contacto = $this->obtenerContacto($linea, $userId);
 
                                 if ($contacto) {
-                                    $personalizedBody = $this->reemplazarPlaceholders($tarea->body, $contacto);
+                                    // Reemplazar placeholders en texto visible
+                                    $personalizedBody = $this->reemplazarPlaceholders($tarea->body, $contacto, $customFields);
+
+                                    // Generar parameters para WhatsApp
+                                    $bodyParams = [];
+                                    preg_match_all('/--(.*?)--/', $tarea->body, $matches);
+                                    foreach ($matches[1] as $fieldName) {
+                                        $fieldId = $customFields[$fieldName] ?? null;
+                                        $value = $contacto->customFieldValues->where('custom_field_id', $fieldId)->first()->value ?? 'sin valor definido';
+                                        $bodyParams[] = ['type' => 'text', 'text' => $value];
+                                    }
+
+                                    // Inyectar parameters al payload
+                                    foreach ($payload['template']['components'] as &$component) {
+                                        if ($component['type'] === 'body') {
+                                            $component['parameters'] = $bodyParams;
+                                            break;
+                                        }
+                                    }
+
                                     $payload['to'] = $linea;
-                                    SendMessage::dispatch($tarea->token_app, $tarea->phone_id, $payload, $personalizedBody, $tarea->messageData, $tarea->distintivo)->onQueue('whatsapp-queue');
+
+                                    SendMessage::dispatch(
+                                        $tarea->token_app,
+                                        $tarea->phone_id,
+                                        $payload,
+                                        $personalizedBody,
+                                        $tarea->messageData,
+                                        $tarea->distintivo
+                                    )->onQueue('whatsapp-queue');
                                 } else {
                                     Log::warning("Contacto no encontrado para el número: $linea");
                                 }
@@ -101,16 +107,6 @@ class SendTask extends Command
         $this->info('Tarea programada completada.');
     }
 
-
-
-
-
-    /**
-     * Obtener el user_id desde el phone_id.
-     *
-     * @param int $phoneId
-     * @return int|null
-     */
     protected function obtenerUserIdDesdePhoneId($phoneId)
     {
         $numero = DB::table('numeros')->where('id_telefono', $phoneId)->first();
@@ -121,13 +117,6 @@ class SendTask extends Command
         return null;
     }
 
-    /**
-     * Obtener el contacto por número de teléfono y usuario.
-     *
-     * @param string $telefono
-     * @param int $userId
-     * @return Contacto|null
-     */
     protected function obtenerContacto($telefono, $userId)
     {
         $user = User::find($userId);
@@ -141,17 +130,9 @@ class SendTask extends Command
             ->first();
     }
 
-    /**
-     * Reemplazar los placeholders en el cuerpo del mensaje.
-     *
-     * @param string $body
-     * @param Contacto $contacto
-     * @return string
-     */
-    protected function reemplazarPlaceholders($body, $contacto)
+    protected function reemplazarPlaceholders($body, $contacto, $customFields)
     {
         $customFieldValues = $contacto->customFieldValues->pluck('value', 'custom_field_id')->toArray();
-        $customFields = CustomField::pluck('id', 'name')->toArray();
 
         foreach ($customFields as $fieldName => $fieldId) {
             $placeholder = '--' . $fieldName . '--';
@@ -162,14 +143,6 @@ class SendTask extends Command
         return $body;
     }
 
-    /**
-     * Registrar el envío en la base de datos.
-     *
-     * @param string $nombrePlantilla
-     * @param int $numeroDestinatarios
-     * @param string $body
-     * @param array $tags
-     */
     protected function registrarEnvio($nombrePlantilla, $numeroDestinatarios, $body, $tags)
     {
         $envio = new Envio();
