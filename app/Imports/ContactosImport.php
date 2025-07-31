@@ -18,8 +18,9 @@ use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithCustomCsvSettings;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
+use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 
-class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBatchInserts, WithChunkReading, WithCustomCsvSettings
+class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBatchInserts, WithChunkReading, WithCustomCsvSettings, SkipsEmptyRows
 {
     protected $user;
     protected $customFieldMap;
@@ -53,6 +54,7 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
         static $rowIndex = 1;
         $currentRow = $rowIndex++;
 
+
         // Validar que las etiquetas existen antes de procesar el contacto
         if (!empty($row['tags'])) {
             $tagNames = explode(',', $row['tags']);
@@ -79,7 +81,7 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
 
         if ($contacto) {
             // ✅ Si el contacto ya existe, verificar si el usuario ya lo tiene asociado
-            if (!$user->contactos->contains($contacto->id)) {
+            if (!UserContact::where('user_id', $user->id)->where('contacto_id', $contacto->id)->exists()) {
                 UserContact::create([
                     'user_id' => $user->id,
                     'contacto_id' => $contacto->id,
@@ -99,7 +101,7 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
                     'apellido' => $row['apellido'],
                     'correo' => $row['correo'],
                     'telefono' => $row['telefono'],
-                    "notas" => $row['notas'],
+                    'notas' => isset($row['notas']) ? $row['notas'] : null,
                 ]);
 
                 // Asociar el contacto al usuario autenticado
@@ -145,9 +147,8 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
                 'required'
             ],
             '*.telefono' => [
-                'integer',
-                // 'digits:12',
-                'required'
+                'required',
+                'regex:/^57\d{10}$/'
             ],
             '*.tags' => [
                 'required'
@@ -160,10 +161,38 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
         return [
             '*.nombre.required' => 'El campo nombre es obligatorio.',
             '*.nombre.max' => 'El campo nombre no debe superar los 255 caracteres.',
-            '*.telefono.integer' => 'El campo teléfono debe ser un número entero.',
             // '*.telefono.max' => 'El campo teléfono no debe superar los 12 dígitos.',
             '*.telefono.required' => 'El campo teléfono es obligatorio.',
             '*.tags.required' => 'El campo tags es obligatorio.',
         ];
     }
+
+    protected function normalizePhone($telefono)
+    {
+        // Elimina todo lo que no sea número
+        $telefono = preg_replace('/\D+/', '', $telefono);
+
+        // Si no empieza con "57", lo agregamos
+        if (!preg_match('/^57/', $telefono)) {
+            $telefono = '57' . $telefono;
+        }
+
+        return $telefono;
+    }
+
+    public function prepareForValidation($data, $index)
+    {
+        if (!empty($data['telefono'])) {
+            // Limpia y normaliza el número aquí
+            $telefono = preg_replace('/\D+/', '', $data['telefono']);
+            if (!preg_match('/^57/', $telefono)) {
+                $telefono = '57' . $telefono;
+            }
+            $data['telefono'] = $telefono;
+        }
+
+        return $data;
+    }
+
+
 }
