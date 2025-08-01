@@ -58,9 +58,22 @@ class SendTask extends Command
                                     $bodyParams = [];
                                     preg_match_all('/--(.*?)--/', $tarea->body, $matches);
                                     foreach ($matches[1] as $fieldName) {
+                                        $value = null;
+
+                                        // Buscar primero en campos personalizados
                                         $fieldId = $customFields[$fieldName] ?? null;
-                                        $value = $contacto->customFieldValues->where('custom_field_id', $fieldId)->first()->value ?? 'sin valor definido';
-                                        $bodyParams[] = ['type' => 'text', 'text' => $value];
+                                        if ($fieldId) {
+                                            $value = $contacto->customFieldValues->where('custom_field_id', $fieldId)->first()->value ?? null;
+                                        }
+
+                                        // Si no existe en campos personalizados, buscar en propiedades del contacto
+                                        if (is_null($value) && isset($contacto->$fieldName)) {
+                                            $value = $contacto->$fieldName;
+                                        }
+
+                                        // Asignar valor final o fallback
+                                        $bodyParams[] = ['type' => 'text', 'text' => $value ?? 'sin valor definido'];
+
                                     }
 
                                     // Inyectar parameters al payload
@@ -136,12 +149,26 @@ class SendTask extends Command
 
         foreach ($customFields as $fieldName => $fieldId) {
             $placeholder = '--' . $fieldName . '--';
-            $value = $customFieldValues[$fieldId] ?? 'sin valor definido';
+
+            // ✅ Si hay valor en campos personalizados, úsalo
+            if (isset($customFieldValues[$fieldId])) {
+                $value = $customFieldValues[$fieldId];
+            }
+            // ✅ Si el campo es también una propiedad del contacto, úsala
+            elseif (isset($contacto->$fieldName) && !is_null($contacto->$fieldName)) {
+                $value = $contacto->$fieldName;
+            }
+            // ❌ En última instancia, si no hay nada...
+            else {
+                $value = 'sin valor definido';
+            }
+
             $body = str_replace($placeholder, $value, $body);
         }
 
         return $body;
     }
+
 
     protected function registrarEnvio($nombrePlantilla, $numeroDestinatarios, $body, $tags)
     {

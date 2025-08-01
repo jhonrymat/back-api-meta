@@ -280,13 +280,31 @@ class ContactoController extends Controller
     public function uploadUsers(Request $request)
     {
         try {
-            Excel::import(new ContactosImport, $request->file);
-            return redirect()->route('contactos.index')->with('success', 'Contactos importados con éxito');
+            // Instanciar el importador
+            $importador = new ContactosImport();
+
+            // Ejecutar la importación
+            Excel::import($importador, $request->file);
+
+            // Recuperar filas omitidas
+            $omitidas = $importador->getFilasOmitidas();
+
+            // Construir mensaje adicional
+            $mensaje = 'Contactos importados con éxito.';
+            if (!empty($omitidas)) {
+                $mensaje .= ' Algunas filas fueron omitidas por estar duplicadas: ';
+                foreach ($omitidas as $info) {
+                    $mensaje .= "Fila {$info['fila']} (Tel: {$info['telefono']}). ";
+                }
+            }
+
+            return redirect()->route('contactos.index')->with('success', $mensaje);
+
         } catch (ValidationException $e) {
             $errors = [];
             foreach ($e->errors() as $field => $messages) {
                 foreach ($messages as $message) {
-                    $errors[] = $message; // Capturar todos los mensajes de error
+                    $errors[] = $message;
                 }
             }
 

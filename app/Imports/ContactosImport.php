@@ -24,6 +24,8 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
 {
     protected $user;
     protected $customFieldMap;
+    protected $filasOmitidas = [];
+
 
     public function __construct()
     {
@@ -80,19 +82,21 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
         $contacto = Contacto::where('telefono', $row['telefono'])->first();
 
         if ($contacto) {
-            // ✅ Si el contacto ya existe, verificar si el usuario ya lo tiene asociado
             if (!UserContact::where('user_id', $user->id)->where('contacto_id', $contacto->id)->exists()) {
                 UserContact::create([
                     'user_id' => $user->id,
                     'contacto_id' => $contacto->id,
                 ]);
-            } else {
-                // ⚠️ Si el contacto ya está registrado para el usuario, lanzar una excepción
-                $validator = Validator::make([], []);
-                $validator->errors()->add("Fila {$currentRow}", "El teléfono {$row['telefono']} ya está registrado en la fila {$currentRow}.");
-
-                throw ValidationException::withMessages($validator->errors()->toArray());
             }
+
+            // 🚫 Contacto ya existe, lo omitimos y registramos la fila
+            $this->filasOmitidas[] = [
+                'fila' => $currentRow,
+                'telefono' => $row['telefono'],
+                'motivo' => 'Ya existe en la base de datos',
+            ];
+
+            return null;
         } else {
             // ✅ Si el contacto no existe, lo creamos
             try {
@@ -193,6 +197,12 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
 
         return $data;
     }
+
+    public function getFilasOmitidas(): array
+    {
+        return $this->filasOmitidas;
+    }
+
 
 
 }
