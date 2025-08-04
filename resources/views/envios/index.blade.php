@@ -54,8 +54,18 @@
                             <span class="badge badge-warning">{{ $app->status }}</span>
                         @elseif($app->status == 'Completado')
                             <span class="badge badge-success">{{ $app->status }}</span>
+                        @elseif($app->status == 'Fallido')
+                            <span class="badge badge-danger">{{ $app->status }}</span>
                         @else
-                            Sin estado
+                            <span class="badge badge-secondary">Sin estado</span>
+                        @endif
+
+                        @if ($app->batch_id && $app->status === 'Pendiente')
+                            <div id="progress-{{ $app->id }}" class="progress mt-2" style="height: 10px;">
+                                <div class="progress-bar bg-info" role="progressbar" style="width: 0%" aria-valuenow="0"
+                                    aria-valuemin="0" aria-valuemax="100">
+                                </div>
+                            </div>
                         @endif
                     </td>
                     <td>
@@ -86,6 +96,37 @@
                 [0, "desc"]
             ] // Ordenar por la primera columna (created_at) de manera descendente
         });
+
+        @foreach ($envios as $app)
+            @if ($app->batch_id && $app->status == 'Pendiente')
+                (function pollBatch_{{ $app->id }}() {
+                    $.ajax({
+                        url: 'estado-envio/{{ $app->id }}',
+                        method: 'GET',
+                        success: function(data) {
+                            const porcentaje = data.progreso;
+                            const barra = document.querySelector(
+                                '#progress-{{ $app->id }} .progress-bar');
+                            if (barra) {
+                                barra.style.width = porcentaje + '%';
+                                barra.setAttribute('aria-valuenow', porcentaje);
+                                barra.textContent = porcentaje + '%';
+                                if (porcentaje >= 100) {
+                                    barra.classList.remove('bg-info');
+                                    barra.classList.add('bg-success');
+                                } else {
+                                    // Si aún no se ha completado, volver a consultar en 10 segundos
+                                    setTimeout(pollBatch_{{ $app->id }}, 10000);
+                                }
+                            }
+                        },
+                        error: function() {
+                            console.warn('No se pudo obtener el estado del envío {{ $app->id }}');
+                        }
+                    });
+                })();
+            @endif
+        @endforeach
     </script>
 
 

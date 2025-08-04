@@ -6,6 +6,7 @@ use Exception;
 use App\Models\Envio;
 use App\Models\Message;
 use App\Libraries\Whatsapp;
+use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -18,7 +19,7 @@ use Illuminate\Contracts\Queue\ShouldBeUnique;
 
 class SendMessage implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, Batchable;
 
     public $payload;
     public $body;
@@ -49,6 +50,7 @@ class SendMessage implements ShouldQueue
      */
     public function handle()
     {
+        sleep(10);
         try {
             $wp = new Whatsapp();
             $request = $wp->genericPayload($this->payload, $this->tokenApp, $this->phone_id);

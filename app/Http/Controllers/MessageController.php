@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Exception;
+use Throwable;
 use Carbon\Carbon;
 use App\Models\Tag;
 use App\Models\Envio;
@@ -12,6 +13,7 @@ use App\Models\Numeros;
 use App\Models\Contacto;
 use PhpParser\Node\Expr;
 use App\Jobs\SendMessage;
+use Illuminate\Bus\Batch;
 use App\Models\Distintivo;
 use App\Libraries\Whatsapp;
 use App\Models\CustomField;
@@ -21,9 +23,12 @@ use Illuminate\Support\Str;
 use App\Models\Aplicaciones;
 use Illuminate\Http\Request;
 use App\Models\TareaProgramada;
+use App\Jobs\SendNotificationJob;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
+
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Storage;
@@ -294,6 +299,8 @@ class MessageController extends Controller
             Log::error('Error al enviar mensaje de prueba a jhon: ' . $e->getMessage());
         }
     }
+
+
 
     public function sendMessages($plantilla)
     {
@@ -567,7 +574,8 @@ class MessageController extends Controller
             $distintivo = $input['distintivoSelect'];
             $tags = !empty($input['selectedTags']) ? $input['selectedTags'] : [22];
             $template = $wp->loadTemplateByName($templateName, $templateLang, $tokenApp, $waba_id_app);
-
+            // Inicializar la colección de trabajos
+            $jobs = collect();
             if (!$template) {
                 throw new Exception("Invalid template or template not found.");
             }
@@ -638,7 +646,10 @@ class MessageController extends Controller
                 'success' => true,
                 'message' => 'Se ha creado el envió con éxito.',
             ], 200)->send();
-            fastcgi_finish_request(); // Finaliza la respuesta HTTP al frontend
+            if (function_exists('fastcgi_finish_request')) {
+                fastcgi_finish_request();
+            }
+
 
             if ($fechaProgramada !== null) {
                 $fechaFormateada = Carbon::parse($fechaProgramada)->toDateTimeString();
@@ -781,21 +792,44 @@ class MessageController extends Controller
                             ],
                         ];
                     }
-
-                    SendMessage::dispatch($tokenApp, $phone_id, $payload, $personalizedBody, $messageData, $distintivo)->onQueue('whatsapp-queue');
+                    // 👇 Agrega el job a la colección en lugar de despacharlo directamente
+                    $jobs->push(
+                        new SendMessage($tokenApp, $phone_id, $payload, $personalizedBody, $messageData, $distintivo)
+                    );
                 }
-
                 $envio = new Envio();
                 $envio->nombrePlantilla = $templateName;
                 $envio->numeroDestinatarios = count($recipients);
-                $envio->status = 'Completado';
+                $envio->status = 'Pendiente';
                 $envio->body = $personalizedBody;
                 $envio->tag = $tags;
                 $envio->save();
 
-                $user->envios()->attach($envio->id);
+                $user->envios()->syncWithoutDetaching([$envio->id]);
 
-                Log::info('envio encolado' . count($recipients));
+
+                // 👇 Despacha el batch y guarda el ID
+
+                $batch = Bus::batch($jobs)
+                    ->then(function (Batch $batch) use ($envio, $user) {
+                        $envio->status = 'Completado';
+                        $envio->save();
+                        Log::info("✅ Batch finalizado con éxito: ID {$batch->id}");
+                        // sendNotification
+                        dispatch(new SendNotificationJob($user));
+                    })
+                    ->catch(function (Batch $batch, Throwable $e) use ($envio) {
+                        $envio->status = 'Fallido';
+                        $envio->save();
+                        Log::error("❌ Batch ID {$batch->id} falló: {$e->getMessage()}");
+                    })
+                    ->onQueue('whatsapp-queue')
+                    ->dispatch();
+
+                $envio->batch_id = $batch->id;
+                $envio->save();
+
+                Log::info('envio encolado ' . count($recipients));
             }
 
             if (!empty($input['status_send'])) {

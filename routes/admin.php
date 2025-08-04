@@ -1,21 +1,24 @@
 <?php
 
+use App\Models\User;
 use App\Models\Reporte;
 use App\Http\Controllers\BotIA;
+use App\Jobs\SendNotificationJob;
 use Illuminate\Support\Facades\DB;
+// use Illuminate\Support\Facades\Redis;
 use OpenAI\Laravel\Facades\OpenAI;
 use App\Livewire\ContactoComponent;
-// use Illuminate\Support\Facades\Redis;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\BotController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\EmailController;
 use App\Http\Controllers\EnvioController;
+
 use App\Http\Controllers\GroupController;
 use App\Http\Controllers\LeadsController;
 use App\Http\Controllers\RolesController;
-
 use App\Http\Controllers\ClocalController;
 use App\Http\Controllers\ConteoController;
 use App\Http\Controllers\ChatBotController;
@@ -99,6 +102,23 @@ Route::post('upload-pdf', [MessageController::class, 'upload'])->middleware('can
 Route::get('estadisticas', [EstadisticasController::class, 'index'])->middleware('can:estadisticas')->name('estadisticas'); //mostrar todos los registros
 Route::post('/estadisticas/get-statistics', [EstadisticasController::class, 'getStatistics'])->name('get-statistics');
 Route::get('envios-plantillas', [EnvioController::class, 'index'])->middleware('can:envios-plantillas')->name('envios-plantillas'); //mostrar todos los registros
+Route::get('estado-envio/{envio}', function (App\Models\Envio $envio) {
+    $batch = Bus::findBatch($envio->batch_id);
+
+    if (!$batch) {
+        return response()->json(['status' => 'No encontrado'], 404);
+    }
+
+    return response()->json([
+        'progreso' => $batch->progress(),
+        'total' => $batch->totalJobs,
+        'completados' => $batch->processedJobs(),
+        'fallidos' => $batch->failedJobs,
+        'estado' => $batch->finished() ? 'Finalizado' : ($batch->cancelled() ? 'Cancelado' : 'En progreso'),
+    ]);
+});
+// sendNotification
+
 // exporta mensajes
 Route::get('exportar-mensajes/{id}', [EstadisticasController::class, 'exportar'])->name('exportar-mensajes');
 
@@ -256,6 +276,18 @@ Route::post('ask-bot-embedded', [BotIA::class, 'askBotForEmbed'])->middleware('c
 Route::post('upload-image', [BotIA::class, 'uploadImage'])->middleware('cors.custom')->withoutMiddleware('auth');
 // borrar hilo deleteThread
 Route::delete('delete-thread', [BotIA::class, 'deleteThread'])->name('deleteThread');
+
+Route::get('test-notification-job/{userId}', function ($userId) {
+    $user = User::find($userId);
+
+    if (!$user) {
+        return response()->json(['error' => 'Usuario no encontrado'], 404);
+    }
+
+    dispatch(new SendNotificationJob($user));
+
+    return response()->json(['status' => 'Job encolado correctamente para el usuario ' . $user->name]);
+});
 
 // routes/api.php o web.php
 Route::get('verificar-contacto/{wa_id}', function ($wa_id) {

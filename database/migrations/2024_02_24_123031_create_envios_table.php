@@ -20,6 +20,7 @@ class CreateEnviosTable extends Migration
             $table->string('status');
             $table->longText('body')->nullable();
             $table->json('tag')->nullable();
+            $table->uuid('batch_id')->nullable();
             $table->timestamps();
         });
     }

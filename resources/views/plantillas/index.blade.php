@@ -654,10 +654,6 @@
                         }
                     });
 
-                    // Mostrar mensaje al usuario
-                    // Swal.fire('Error en el envío', 'No se pudo enviar el mensaje. Inténtalo de nuevo.',
-                    // 'error');
-
                     // Mostrar SweetAlert con detalles del error
                     Swal.fire({
                         title: 'Error en el envío',
