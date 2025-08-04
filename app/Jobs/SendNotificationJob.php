@@ -42,13 +42,13 @@ class SendNotificationJob implements ShouldQueue
                 return;
             }
 
-            Log::info("Numero completo {$numero->id}");
+            // Log::info("Numero completo {$numero->id}");
 
             // 2. Extraer ID y token
             $telefonoId = $numero->id_telefono;
-            Log::info("ID de teléfono: {$telefonoId}");
+            // Log::info("ID de teléfono: {$telefonoId}");
             $tokenApi = $numero->aplicacion->token_api;
-            Log::info("Token de API: {$tokenApi}");
+            // Log::info("Token de API: {$tokenApi}");
             $version = 'v22.0';
 
             $payload = [
