@@ -50,7 +50,7 @@ class SendMessage implements ShouldQueue
      */
     public function handle()
     {
-        sleep(10);
+        // sleep(10);
         try {
             $wp = new Whatsapp();
             $request = $wp->genericPayload($this->payload, $this->tokenApp, $this->phone_id);
