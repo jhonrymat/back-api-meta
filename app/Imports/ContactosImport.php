@@ -26,17 +26,33 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
     protected $customFieldMap;
     protected $filasOmitidas = [];
 
+    // Cache para evitar múltiples consultas
+    protected $existingPhones = [];
+    protected $allTags = [];
 
     public function __construct()
     {
         $this->user = Auth::user();
-        // Crear un mapa de los nombres de los campos personalizados a sus IDs
-        $this->customFieldMap = CustomField::where('user_id', $this->user->id)->pluck('id', 'name')->mapWithKeys(function ($item, $key) {
-            return [$this->normalizeName($key) => $item];
+
+        // Cachear campos personalizados
+        $this->customFieldMap = CustomField::where('user_id', $this->user->id)
+            ->pluck('id', 'name')
+            ->mapWithKeys(function ($id, $name) {
+                return [$this->normalizeName($name) => $id];
+            });
+
+        // Cachear todas las etiquetas existentes
+        $this->allTags = Tag::pluck('id', 'nombre')->mapWithKeys(function ($id, $name) {
+            return [strtolower(trim($name)) => $id];
         });
+
+        // Cachear los teléfonos de contactos ya asociados al usuario
+        $this->existingPhones = Contacto::join('user_contacts', 'contactos.id', '=', 'user_contacts.contacto_id')
+            ->where('user_contacts.user_id', $this->user->id)
+            ->pluck('telefono')
+            ->toArray();
     }
 
-    // Método para normalizar los nombres (reemplaza espacios por guiones bajos y pasa a minúsculas)
     protected function normalizeName($name)
     {
         return str_replace(' ', '_', strtolower($name));
@@ -48,115 +64,97 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
             'input_encoding' => 'UTF-8'
         ];
     }
+
     public function model(array $row)
     {
-        $user = $this->user;
-
-        // Obtener el número de fila actual
         static $rowIndex = 1;
         $currentRow = $rowIndex++;
 
+        $telefono = $row['telefono'];
 
-        // Validar que las etiquetas existen antes de procesar el contacto
+        // Validar si ya existe el contacto para el usuario actual
+        if (in_array($telefono, $this->existingPhones)) {
+            $this->filasOmitidas[] = [
+                'fila' => $currentRow,
+                'telefono' => $telefono,
+                'motivo' => 'Ya existe en la base de datos',
+            ];
+            return null;
+        }
+
+        // Validar etiquetas
+        $tagIds = [];
         if (!empty($row['tags'])) {
             $tagNames = explode(',', $row['tags']);
             $invalidTags = [];
 
-            foreach ($tagNames as $tagName) {
-                $tagNameTrimmed = trim($tagName);
-                if (!Tag::where('nombre', $tagNameTrimmed)->exists()) {
-                    $invalidTags[] = $tagNameTrimmed;
+            foreach ($tagNames as $name) {
+                $key = strtolower(trim($name));
+                if (isset($this->allTags[$key])) {
+                    $tagIds[] = $this->allTags[$key];
+                } else {
+                    $invalidTags[] = $name;
                 }
             }
 
-            // Si hay etiquetas inexistentes, lanzar error con la fila correspondiente
             if (!empty($invalidTags)) {
-                $validator = Validator::make([], []);
-                $validator->errors()->add("Fila {$currentRow}", "Las siguientes etiquetas no existen en la fila {$currentRow}: " . implode(', ', $invalidTags));
-
-                throw ValidationException::withMessages($validator->errors()->toArray());
+                throw ValidationException::withMessages([
+                    "Fila {$currentRow}" => "Las siguientes etiquetas no existen: " . implode(', ', $invalidTags),
+                ]);
             }
         }
 
-        // 📌 **Validar que el teléfono no esté duplicado**
-        $contacto = Contacto::where('telefono', $row['telefono'])->first();
+        try {
+            DB::beginTransaction();
 
-        if ($contacto) {
-            if (!UserContact::where('user_id', $user->id)->where('contacto_id', $contacto->id)->exists()) {
-                UserContact::create([
-                    'user_id' => $user->id,
-                    'contacto_id' => $contacto->id,
-                ]);
+            $contacto = Contacto::create([
+                'nombre' => $row['nombre'],
+                'apellido' => $row['apellido'],
+                'correo' => $row['correo'],
+                'telefono' => $telefono,
+                'notas' => $row['notas'] ?? null,
+            ]);
+
+            UserContact::create([
+                'user_id' => $this->user->id,
+                'contacto_id' => $contacto->id,
+            ]);
+
+            if (!empty($tagIds)) {
+                $contacto->tags()->syncWithoutDetaching($tagIds);
             }
 
-            // 🚫 Contacto ya existe, lo omitimos y registramos la fila
-            $this->filasOmitidas[] = [
-                'fila' => $currentRow,
-                'telefono' => $row['telefono'],
-                'motivo' => 'Ya existe en la base de datos',
-            ];
+            // Agregar teléfono a cache para evitar duplicados en siguientes filas
+            $this->existingPhones[] = $telefono;
 
-            return null;
-        } else {
-            // ✅ Si el contacto no existe, lo creamos
-            try {
-                $contacto = Contacto::create([
-                    'nombre' => $row['nombre'],
-                    'apellido' => $row['apellido'],
-                    'correo' => $row['correo'],
-                    'telefono' => $row['telefono'],
-                    'notas' => isset($row['notas']) ? $row['notas'] : null,
-                ]);
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
 
-                // Asociar el contacto al usuario autenticado
-                UserContact::create([
-                    'user_id' => $user->id,
-                    'contacto_id' => $contacto->id,
-                ]);
-            } catch (\Exception $e) {
-                // ⚠️ Si ocurre un error de duplicado de teléfono, lanzar un error de validación
-                $validator = Validator::make([], []);
-                $validator->errors()->add("Fila {$currentRow}", "Error: el teléfono {$row['telefono']} ya existe en la base de datos.");
-
-                throw ValidationException::withMessages($validator->errors()->toArray());
-            }
+            $validator = Validator::make([], []);
+            $validator->errors()->add("Fila {$currentRow}", "Error al guardar el contacto {$telefono}: {$e->getMessage()}");
+            throw ValidationException::withMessages($validator->errors()->toArray());
         }
 
-        // ✅ Asociar etiquetas existentes al contacto
-        if (!empty($row['tags'])) {
-            $tagIds = Tag::whereIn('nombre', $tagNames)->pluck('id')->toArray();
-            $contacto->tags()->syncWithoutDetaching($tagIds);
-        }
+        return null;
     }
-
-
-
 
     public function batchSize(): int
     {
-        return 4000;
+        return 200;
     }
 
     public function chunkSize(): int
     {
-        return 4000;
+        return 200;
     }
-
 
     public function rules(): array
     {
         return [
-            '*.nombre' => [
-                'max:255',
-                'required'
-            ],
-            '*.telefono' => [
-                'required',
-                'regex:/^57\d{10}$/'
-            ],
-            '*.tags' => [
-                'required'
-            ],
+            '*.nombre' => ['required', 'max:255'],
+            '*.telefono' => ['required', 'regex:/^57\d{10}$/'],
+            '*.tags' => ['required'],
         ];
     }
 
@@ -165,29 +163,14 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
         return [
             '*.nombre.required' => 'El campo nombre es obligatorio.',
             '*.nombre.max' => 'El campo nombre no debe superar los 255 caracteres.',
-            // '*.telefono.max' => 'El campo teléfono no debe superar los 12 dígitos.',
             '*.telefono.required' => 'El campo teléfono es obligatorio.',
             '*.tags.required' => 'El campo tags es obligatorio.',
         ];
     }
 
-    protected function normalizePhone($telefono)
-    {
-        // Elimina todo lo que no sea número
-        $telefono = preg_replace('/\D+/', '', $telefono);
-
-        // Si no empieza con "57", lo agregamos
-        if (!preg_match('/^57/', $telefono)) {
-            $telefono = '57' . $telefono;
-        }
-
-        return $telefono;
-    }
-
     public function prepareForValidation($data, $index)
     {
         if (!empty($data['telefono'])) {
-            // Limpia y normaliza el número aquí
             $telefono = preg_replace('/\D+/', '', $data['telefono']);
             if (!preg_match('/^57/', $telefono)) {
                 $telefono = '57' . $telefono;
@@ -202,7 +185,4 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
     {
         return $this->filasOmitidas;
     }
-
-
-
 }

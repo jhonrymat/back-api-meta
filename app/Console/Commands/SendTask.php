@@ -54,35 +54,34 @@ class SendTask extends Command
                                     // Reemplazar placeholders en texto visible
                                     $personalizedBody = $this->reemplazarPlaceholders($tarea->body, $contacto, $customFields);
 
-                                    // Generar parameters para WhatsApp
-                                    $bodyParams = [];
+                                    // Buscar placeholders en el body
                                     preg_match_all('/--(.*?)--/', $tarea->body, $matches);
-                                    foreach ($matches[1] as $fieldName) {
-                                        $value = null;
 
-                                        // Buscar primero en campos personalizados
-                                        $fieldId = $customFields[$fieldName] ?? null;
-                                        if ($fieldId) {
-                                            $value = $contacto->customFieldValues->where('custom_field_id', $fieldId)->first()->value ?? null;
+                                    if (!empty($matches[1])) {
+                                        foreach ($payload['template']['components'] as &$component) {
+                                            if ($component['type'] === 'body' && isset($component['parameters'])) {
+                                                foreach ($component['parameters'] as &$param) {
+                                                    if ($param['type'] === 'text' && preg_match('/--(.*?)--/', $param['text'], $match)) {
+                                                        $fieldName = $match[1];
+                                                        $value = null;
+
+                                                        $fieldId = $customFields[$fieldName] ?? null;
+                                                        if ($fieldId) {
+                                                            $value = $contacto->customFieldValues->where('custom_field_id', $fieldId)->first()->value ?? null;
+                                                        }
+
+                                                        if (is_null($value) && isset($contacto->$fieldName)) {
+                                                            $value = $contacto->$fieldName;
+                                                        }
+
+                                                        $param['text'] = $value ?? 'sin valor definido';
+                                                    }
+                                                }
+                                                break;
+                                            }
                                         }
-
-                                        // Si no existe en campos personalizados, buscar en propiedades del contacto
-                                        if (is_null($value) && isset($contacto->$fieldName)) {
-                                            $value = $contacto->$fieldName;
-                                        }
-
-                                        // Asignar valor final o fallback
-                                        $bodyParams[] = ['type' => 'text', 'text' => $value ?? 'sin valor definido'];
-
                                     }
 
-                                    // Inyectar parameters al payload
-                                    foreach ($payload['template']['components'] as &$component) {
-                                        if ($component['type'] === 'body') {
-                                            $component['parameters'] = $bodyParams;
-                                            break;
-                                        }
-                                    }
 
                                     $payload['to'] = $linea;
 
