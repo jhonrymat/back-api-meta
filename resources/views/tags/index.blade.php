@@ -91,6 +91,14 @@
     </script>
     <script>
         $(document).ready(function() {
+            // Sincroniza el picker con el input en el modal de creación
+            $('#colorPicker').on('input', function() {
+                $('#color').val(this.value);
+            });
+        });
+    </script>
+    <script>
+        $(document).ready(function() {
             $('form[id^="editForm-"]').on('submit', function(e) {
                 e.preventDefault(); // Evitar la recarga de la página
                 var appId = this.id.split('-')[1]; // Obtener el ID de la aplicación
@@ -151,10 +159,19 @@
     </script>
     <script>
         function updateColorValue(appId) {
-            var colorPicker = document.querySelector('#modal-edit-' + appId + ' input[type="color"]');
-            var colorInput = document.getElementById('color-' + appId);
-            colorInput.value = colorPicker.value;
+            var colorPicker = document.querySelector('#colorPicker-' + appId);
+            var colorInput = document.querySelector('#color-' + appId);
+            console.log("Actualizando color para", appId, colorPicker.value);
+            if (colorPicker && colorInput) {
+                colorInput.value = colorPicker.value;
+            }
         }
+        $(document).ready(function() {
+            $('input[type="color"]').on('input', function() {
+                const appId = $(this).attr('id').split('colorPicker-')[1];
+                $('#color-' + appId).val(this.value);
+            });
+        });
     </script>
     <script>
         $(document).ready(function() {

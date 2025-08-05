@@ -23,15 +23,17 @@
                                 value="{{ $app->nombre }}" required>
                         </div>
                         <div class="form-group">
-                            <label for="nombre-{{ $app->id }}">descripcion</label>
-                            <input type="text" class="form-control" id="nombre-{{ $app->id }}"
+                            <label for="descripcion-{{ $app->id }}">Descripción</label>
+                            <input type="text" class="form-control" id="descripcion-{{ $app->id }}"
                                 name="descripcion" value="{{ $app->descripcion }}" required>
                         </div>
                         <div class="form-group">
                             <label for="color-{{ $app->id }}" class="form-label">Color etiqueta</label>
-                            <input type="text" class="form-control" id="color-{{ $app->id }}" name="color" value="{{ $app->color }}" title="Choose your color" required>
+                            <input type="text" class="form-control" id="color-{{ $app->id }}" name="color"
+                                value="{{ $app->color }}" required>
                             <!-- Selector de color -->
-                            <input type="color" onchange="updateColorValue('{{ $app->id }}')" value="{{ $app->color }}">
+                            <input type="color" id="colorPicker-{{ $app->id }}"
+                                onchange="updateColorValue('{{ $app->id }}')" value="{{ $app->color }}">
                         </div>
                     </div>
 
