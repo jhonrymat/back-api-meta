@@ -12,7 +12,8 @@ class Tag extends Model
 
     public function contactos()
     {
-        return $this->belongsToMany(Contacto::class, 'contacto_tag', 'tag_id', 'contacto_id');
+        return $this->belongsToMany(Contacto::class, 'contacto_tag', 'tag_id', 'contacto_id')
+            ->withPivot('user_id');
     }
 
 

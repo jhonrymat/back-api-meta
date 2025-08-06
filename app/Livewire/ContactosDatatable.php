@@ -17,7 +17,11 @@ class ContactosDatatable extends DataTableComponent
 
     public function builder(): \Illuminate\Database\Eloquent\Builder
     {
-        return Contacto::with('tags')->whereHas('users', function ($query) {
+        return Contacto::with([
+            'tags' => function ($query) {
+                $query->wherePivot('user_id', Auth::id());
+            }
+        ])->whereHas('users', function ($query) {
             $query->where('user_id', Auth::id());
         });
     }

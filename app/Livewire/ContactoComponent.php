@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use Livewire\Component;
 use App\Models\Contacto;
+use Illuminate\Support\Facades\DB;
 
 class ContactoComponent extends Component
 {
@@ -45,7 +46,11 @@ class ContactoComponent extends Component
         $this->telefono = $contacto->telefono;
         $this->notas = $contacto->notas;
         // Obtener la primera etiqueta del contacto (ajústalo si es necesario)
-        $this->tagsSeleccionados = $contacto->tags()->pluck('tags.id')->toArray();
+        $this->tagsSeleccionados = $contacto->tags()
+            ->wherePivot('user_id', auth()->id())
+            ->pluck('tags.id')
+            ->toArray();
+
         $this->showEditModal = true;
     }
 
@@ -61,7 +66,34 @@ class ContactoComponent extends Component
             'telefono' => $this->telefono,
             'notas' => $this->notas,
         ]);
-        $contacto->tags()->sync($this->tagsSeleccionados);
+        $userId = auth()->id();
+
+        // Obtener tags actuales del usuario
+        $currentTags = $contacto->tags()
+            ->wherePivot('user_id', $userId)
+            ->pluck('tags.id')
+            ->toArray();
+
+        // Determinar qué agregar y qué quitar
+        $tagsToAdd = array_diff($this->tagsSeleccionados, $currentTags);
+        $tagsToRemove = array_diff($currentTags, $this->tagsSeleccionados);
+
+        // Agregar nuevas relaciones
+        foreach ($tagsToAdd as $tagId) {
+            $contacto->tags()->syncWithoutDetaching([
+                $tagId => ['user_id' => $userId]
+            ]);
+        }
+
+        // Eliminar relaciones antiguas del usuario
+        if (!empty($tagsToRemove)) {
+            DB::table('contacto_tag')
+                ->where('contacto_id', $contacto->id)
+                ->whereIn('tag_id', $tagsToRemove)
+                ->where('user_id', $userId)
+                ->delete();
+        }
+
         $this->resetModal();
         $this->dispatch('Updated');
         $this->dispatch('sweet-alert-good', icon: 'success', title: 'Exito.!', text: 'Contacto actualizado correctamente.');
@@ -79,7 +111,7 @@ class ContactoComponent extends Component
             $this->dispatch('sweet-alert-good', icon: 'error', title: 'Error', text: 'No se puede eliminar un contacto con mensajes asociados.');
             return;
         }
-        $contacto->tags()->detach();
+        $contacto->tags()->wherePivot('user_id', auth()->id())->detach();
         $contacto->delete();
 
         $this->resetModal();

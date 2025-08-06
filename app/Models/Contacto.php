@@ -63,8 +63,10 @@ class Contacto extends Model
 
     public function tags()
     {
-        return $this->belongsToMany(Tag::class, 'contacto_tag', 'contacto_id', 'tag_id');
+        return $this->belongsToMany(Tag::class, 'contacto_tag', 'contacto_id', 'tag_id')
+            ->withPivot('user_id');
     }
+
 
     public function customFieldValues()
     {

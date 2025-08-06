@@ -84,8 +84,13 @@ class ContactoController extends Controller
 
             // Asociar tags si se proporcionan, tanto para contactos nuevos como existentes
             if (!empty($data['etiqueta'])) {
-                $contacto->tags()->syncWithoutDetaching($data['etiqueta']);
+                foreach ($data['etiqueta'] as $tagId) {
+                    $contacto->tags()->syncWithoutDetaching([
+                        $tagId => ['user_id' => $user->id]
+                    ]);
+                }
             }
+
 
             if (isset($request->custom_fields) && is_array($request->custom_fields)) {
                 // Guardar los valores de los campos personalizados
@@ -193,17 +198,34 @@ class ContactoController extends Controller
 
                 // Sincronizar tags específicamente para este usuario
                 if (isset($data['etiqueta'])) {
-                    // Encontrar todos los tags actuales del usuario para este contacto
-                    $currentTags = $contacto->tags()->where('user_id', $user->id)->pluck('tags.id')->toArray();
+                    // Obtener todos los tag_id actuales del usuario para este contacto
+                    $currentTags = $contacto->tags()
+                        ->wherePivot('user_id', $user->id)
+                        ->pluck('tags.id')
+                        ->toArray();
 
-                    // Determinar los tags para agregar y los tags para quitar
-                    $tagsToAdd = array_diff($data['etiqueta'], $currentTags);
-                    $tagsToRemove = array_diff($currentTags, $data['etiqueta']);
+                    $newTags = $data['etiqueta'];
 
-                    // Sincronizar los cambios
-                    $contacto->tags()->syncWithoutDetaching($tagsToAdd);    // Añadir nuevos tags
-                    $contacto->tags()->detach($tagsToRemove);                // Eliminar tags no deseados
+                    $tagsToAdd = array_diff($newTags, $currentTags);
+                    $tagsToRemove = array_diff($currentTags, $newTags);
+
+                    // Añadir nuevos
+                    foreach ($tagsToAdd as $tagId) {
+                        $contacto->tags()->syncWithoutDetaching([
+                            $tagId => ['user_id' => $user->id]
+                        ]);
+                    }
+
+                    // Eliminar antiguos (solo los del usuario actual)
+                    if (!empty($tagsToRemove)) {
+                        DB::table('contacto_tag')
+                            ->where('contacto_id', $contacto->id)
+                            ->whereIn('tag_id', $tagsToRemove)
+                            ->where('user_id', $user->id)
+                            ->delete();
+                    }
                 }
+
 
                 // Actualizar los valores de los campos personalizados
                 if (isset($data['custom_fields'])) {
@@ -256,7 +278,7 @@ class ContactoController extends Controller
                 }
 
                 // Eliminar las relaciones de tags antes de eliminar el contacto
-                $contacto->tags()->detach();
+                $contacto->tags()->wherePivot('user_id', $user->id)->detach();
 
                 // Eliminar las relaciones de campos personalizados antes de eliminar el contacto
                 $contacto->customFieldValues()->delete();

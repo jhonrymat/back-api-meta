@@ -24,6 +24,11 @@ class CreateContactoTagTable extends Migration
                 ->constrained('tags')
                 ->cascadeOnUpdate()
                 ->cascadeOnDelete();
+
+            $table->foreignId('user_id')->after('tag_id')->constrained()->cascadeOnDelete();
+
+            // Opcional: evitar duplicados por usuario
+            $table->unique(['contacto_id', 'tag_id', 'user_id']);
         });
     }
 
