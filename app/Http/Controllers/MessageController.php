@@ -431,7 +431,7 @@ class MessageController extends Controller
                         $contacto->save();
 
                         // Asociar los tags seleccionados al nuevo contacto
-                        $contacto->tags()->attach(22);
+                        $contacto->tags()->attach(22, ['user_id' => auth()->id()]);
                     } else if ($contacto->nombre == $contacto->telefono) {
                         $contacto->nombre = $value['contacts'][0]['profile']['name'];
                         $contacto->save();

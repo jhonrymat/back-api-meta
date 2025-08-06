@@ -3,6 +3,7 @@
 namespace App\Imports;
 
 use App\Models\Tag;
+use App\Models\User;
 use App\Models\Contacto;
 use App\Models\CustomField;
 use App\Models\UserContact;
@@ -10,29 +11,33 @@ use App\Models\CustomFieldValue;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Concerns\ToModel;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
+use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithValidation;
 use Maatwebsite\Excel\Concerns\WithBatchInserts;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithCustomCsvSettings;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\ValidationException;
-use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
+use Maatwebsite\Excel\Concerns\WithStartRow;
 
-class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBatchInserts, WithChunkReading, WithCustomCsvSettings, SkipsEmptyRows
+class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBatchInserts, WithChunkReading, WithCustomCsvSettings, SkipsEmptyRows, WithStartRow
 {
     protected $user;
     protected $customFieldMap;
     protected $filasOmitidas = [];
+    protected int $currentRowOffset = 0;
+
 
     // Cache para evitar múltiples consultas
     protected $existingPhones = [];
     protected $allTags = [];
 
-    public function __construct()
+    public function __construct($userId)
     {
-        $this->user = Auth::user();
+        $this->user = User::findOrFail($userId); // Asegura que el usuario exista
 
         // Cachear campos personalizados
         $this->customFieldMap = CustomField::where('user_id', $this->user->id)
@@ -42,9 +47,12 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
             });
 
         // Cachear todas las etiquetas existentes
-        $this->allTags = Tag::pluck('id', 'nombre')->mapWithKeys(function ($id, $name) {
-            return [strtolower(trim($name)) => $id];
-        });
+        $this->allTags = Tag::where('user_id', $this->user->id)
+            ->pluck('id', 'nombre')
+            ->mapWithKeys(function ($id, $name) {
+                return [strtolower(trim($name)) => $id];
+            });
+
 
         // Cachear los teléfonos de contactos ya asociados al usuario
         $this->existingPhones = Contacto::join('user_contacts', 'contactos.id', '=', 'user_contacts.contacto_id')
@@ -52,11 +60,23 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
             ->pluck('telefono')
             ->toArray();
     }
+    public function __destruct()
+    {
+        if (!empty($this->filasOmitidas)) {
+            Storage::put("importaciones/omitidas_{$this->user->id}.json", json_encode($this->filasOmitidas));
+        }
+    }
 
     protected function normalizeName($name)
     {
         return str_replace(' ', '_', strtolower($name));
     }
+
+    public function startRow(): int
+    {
+        return 2; // Porque el encabezado está en la fila 1
+    }
+
 
     public function getCsvSettings(): array
     {
@@ -67,8 +87,7 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
 
     public function model(array $row)
     {
-        static $rowIndex = 1;
-        $currentRow = $rowIndex++;
+        $currentRow = $this->startRow() + $this->currentRowOffset++;
 
         $telefono = $row['telefono'];
 
@@ -107,22 +126,32 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
         try {
             DB::beginTransaction();
 
-            $contacto = Contacto::create([
-                'nombre' => $row['nombre'],
-                'apellido' => $row['apellido'],
-                'correo' => $row['correo'],
-                'telefono' => $telefono,
-                'notas' => $row['notas'] ?? null,
-            ]);
+            $contacto = Contacto::firstOrCreate(
+                ['telefono' => $telefono],
+                [
+                    'nombre' => $row['nombre'],
+                    'apellido' => $row['apellido'],
+                    'correo' => $row['correo'],
+                    'notas' => $row['notas'] ?? null,
+                ]
+            );
 
-            UserContact::create([
+            // Asociar al usuario si aún no lo tiene
+            UserContact::firstOrCreate([
                 'user_id' => $this->user->id,
                 'contacto_id' => $contacto->id,
             ]);
 
+
             if (!empty($tagIds)) {
-                $contacto->tags()->syncWithoutDetaching($tagIds);
+                foreach ($tagIds as $tagId) {
+                    $contacto->tags()->syncWithoutDetaching([
+                        $tagId => ['user_id' => $this->user->id]
+                    ]);
+                }
             }
+
+
 
             // Agregar teléfono a cache para evitar duplicados en siguientes filas
             $this->existingPhones[] = $telefono;
@@ -131,10 +160,16 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
         } catch (\Exception $e) {
             DB::rollBack();
 
+            Log::error("Error en importación fila {$currentRow} (Tel: {$telefono}): {$e->getMessage()}", [
+                'trace' => $e->getTraceAsString()
+            ]);
+
             $validator = Validator::make([], []);
             $validator->errors()->add("Fila {$currentRow}", "Error al guardar el contacto {$telefono}: {$e->getMessage()}");
             throw ValidationException::withMessages($validator->errors()->toArray());
         }
+
+
 
         return null;
     }

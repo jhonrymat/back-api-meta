@@ -6,20 +6,28 @@ use Exception;
 use Throwable;
 use DataTables;
 use App\Models\Tag;
+use App\Models\User;
 use App\Models\Contacto;
 use App\Models\CustomField;
 use App\Models\UserContact;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use App\Imports\ContactosImport;
+use App\Mail\ImportacionFallida;
 use App\Models\CustomFieldValue;
+use App\Jobs\ImportarContactosJob;
 use Illuminate\Support\Facades\DB;
+use App\Mail\ImportacionFinalizada;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Validation\Rule;
+use Illuminate\Bus\Batch;
 
 class ContactoController extends Controller
 {
@@ -301,50 +309,53 @@ class ContactoController extends Controller
 
     public function uploadUsers(Request $request)
     {
-        try {
-            // Instanciar el importador
-            $importador = new ContactosImport();
+        // Guardar archivo temporalmente
+        $path = $request->file('file')->store('importaciones_temp');
 
-            // Ejecutar la importación
-            Excel::import($importador, $request->file);
-
-            // Recuperar filas omitidas
-            $omitidas = $importador->getFilasOmitidas();
-
-            // Construir mensaje adicional
-            $mensaje = 'Contactos importados con éxito.';
-            if (!empty($omitidas)) {
-                $mensaje .= ' Algunas filas fueron omitidas por estar duplicadas: ';
-                foreach ($omitidas as $info) {
-                    $mensaje .= "Fila {$info['fila']} (Tel: {$info['telefono']}). ";
-                }
-            }
-
-            return redirect()->route('contactos.index')->with('success', $mensaje);
-
-        } catch (ValidationException $e) {
-            $errors = [];
-            foreach ($e->errors() as $field => $messages) {
-                foreach ($messages as $message) {
-                    $errors[] = $message;
-                }
-            }
-
-            return redirect()->back()->withErrors($errors)->withInput();
-        } catch (Exception $e) {
-            Log::error('Ha ocurrido un error al importar los contactos: ' . $e->getMessage(), ['exception' => $e]);
-
-            return redirect()
-                ->back()
-                ->withErrors(['error' => 'Ha ocurrido un error inesperado al importar los contactos. Por favor, inténtalo de nuevo.'])
-                ->withInput();
+        // Usuario actual
+        $userId = Auth::user();
+        if (!$userId) {
+            return redirect()->route('contactos.index')->withErrors(['error' => 'Usuario no autenticado.']);
         }
+        $userId = $userId->id;
+
+        $batch = Bus::batch([
+            new ImportarContactosJob($path, $userId),
+        ])
+            ->then(function (Batch $batch) use ($userId) {
+                $omitidasPath = "importaciones/omitidas_{$userId}.json";
+
+                $omitidas = Storage::exists($omitidasPath)
+                    ? json_decode(Storage::get($omitidasPath), true)
+                    : [];
+
+                // ENVÍA CORREO
+                $user = User::find($userId);
+                if ($user) {
+                    Mail::to($user->email)->send(new ImportacionFinalizada($omitidas)); // Importación con omitidos
+                }
+
+                Storage::delete($omitidasPath);
+
+            })
+            ->catch(function (Batch $batch, Throwable $e) use ($userId) {
+                Log::error("⚠️ Batch fallido para user {$userId}");
+
+                $erroresPath = "importaciones/errores_{$userId}.json";
+
+                $errores = Storage::exists($erroresPath)
+                    ? json_decode(Storage::get($erroresPath), true)
+                    : [];
+                $user = User::find($userId);
+                if ($user) {
+                    Mail::to($user->email)->send(new ImportacionFallida($errores));
+                }
+                Storage::delete($erroresPath);
+            })
+            ->dispatch();
+
+        return redirect()->route('contactos.index')->with('success', 'La importación comenzó en segundo plano. Te notificaremos al finalizar.');
     }
-
-
-
-
-
 
     public function exportar()
     {

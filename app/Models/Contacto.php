@@ -45,13 +45,18 @@ class Contacto extends Model
 
     public function createWithDefaultTag(array $data, $defaultTagName = 'Pendiente')
     {
+        $userId = auth()->id();
+
         $contacto = $this->create($data);
 
-        // Encuentra el tag 'Pendiente' o crea uno si no existe
-        $tag = Tag::firstOrCreate(['nombre' => $defaultTagName], ['descripcion' => 'Descripción pendiente', 'color' => 'gray']);
+        // Busca o crea el tag solo para el usuario actual
+        $tag = Tag::firstOrCreate(
+            ['nombre' => $defaultTagName, 'user_id' => $userId],
+            ['descripcion' => 'Descripción pendiente', 'color' => 'gray']
+        );
 
-        // Asigna el tag 'Pendiente' al nuevo contacto
-        $contacto->tags()->attach($tag->id);
+        // Asocia el tag con el contacto, registrando el user_id en la tabla pivote
+        $contacto->tags()->attach($tag->id, ['user_id' => $userId]);
 
         return $contacto;
     }
