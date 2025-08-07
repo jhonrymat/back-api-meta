@@ -160,6 +160,12 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
         } catch (\Exception $e) {
             DB::rollBack();
 
+            // REINTENTO SI FUE POR BLOQUEO
+            if (str_contains($e->getMessage(), 'Lock wait timeout')) {
+                sleep(1); // espera un segundo
+                return $this->model($row); // reintenta el guardado de esta fila
+            }
+
             Log::error("Error en importación fila {$currentRow} (Tel: {$telefono}): {$e->getMessage()}", [
                 'trace' => $e->getTraceAsString()
             ]);
@@ -176,12 +182,12 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
 
     public function batchSize(): int
     {
-        return 200;
+        return 100;
     }
 
     public function chunkSize(): int
     {
-        return 200;
+        return 100;
     }
 
     public function rules(): array
