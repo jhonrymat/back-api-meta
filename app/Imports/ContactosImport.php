@@ -87,22 +87,6 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
         $telefono = $row['telefono'];
         $intentos = $row['_retries'] ?? 0;
 
-
-        // Validar si ya existe el contacto para el usuario actual
-        // $contactoExistente = Contacto::where('telefono', $telefono)
-        //     ->whereHas('users', fn($q) => $q->where('user_id', $this->user->id))
-        //     ->exists();
-
-        // if ($contactoExistente) {
-        //     $this->filasOmitidas[] = [
-        //         'fila' => $currentRow,
-        //         'telefono' => $telefono,
-        //         'motivo' => 'Ya existe para este usuario',
-        //     ];
-        //     return null;
-        // }
-
-
         // Validar etiquetas
         $tagIds = [];
         if (!empty($row['tags'])) {
@@ -126,9 +110,10 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
         }
 
         try {
-
+            // Buscar contacto por teléfono
             $contacto = Contacto::where('telefono', $telefono)->first();
 
+            // Si no existe, crearlo
             if (!$contacto) {
                 try {
                     $contacto = Contacto::create([
@@ -140,7 +125,6 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
                     ]);
                 } catch (\Illuminate\Database\QueryException $e) {
                     if (str_contains($e->getMessage(), 'Duplicate entry')) {
-                        // Alguien lo insertó justo antes → lo buscamos de nuevo
                         $contacto = Contacto::where('telefono', $telefono)->first();
                     } else {
                         throw $e;
@@ -148,7 +132,6 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
                 }
             }
 
-            // ⬇️ AQUÍ VA
             if (!$contacto) {
                 $this->filasOmitidas[] = [
                     'fila' => $currentRow,
@@ -158,56 +141,62 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
                 return null;
             }
 
-            // Verificar si ya está relacionado con este usuario
+            // Verificar si ya está relacionado con el usuario
             $yaRelacionado = UserContact::where('user_id', $this->user->id)
                 ->where('contacto_id', $contacto->id)
                 ->exists();
 
-            if ($yaRelacionado) {
-                $this->filasOmitidas[] = [
-                    'fila' => $currentRow,
-                    'telefono' => $telefono,
-                    'motivo' => 'Ya existe para este usuario',
-                ];
-                return null;
-            }
-
-
-
-            // Asociar al usuario si aún no lo tiene
-            UserContact::firstOrCreate([
-                'user_id' => $this->user->id,
-                'contacto_id' => $contacto->id,
-            ]);
-
-
+            // Verificar si YA tiene TODAS las etiquetas solicitadas
+            $etiquetasFaltantes = [];
             if (!empty($tagIds)) {
                 foreach ($tagIds as $tagId) {
-                    try {
-                        $contacto->tags()->attach($tagId, ['user_id' => $this->user->id]);
-                    } catch (\Illuminate\Database\QueryException $e) {
-                        if (str_contains($e->getMessage(), 'Duplicate entry')) {
-                            // Ya fue insertado por otro job, ignorar
-                            continue;
-                        } else {
-                            throw $e; // Otro error, relanzar
-                        }
+                    $existeRelacion = DB::table('contacto_tag')
+                        ->where('contacto_id', $contacto->id)
+                        ->where('tag_id', $tagId)
+                        ->where('user_id', $this->user->id)
+                        ->exists();
+
+                    if (!$existeRelacion) {
+                        $etiquetasFaltantes[] = $tagId;
                     }
                 }
             }
 
+            // Si ya está relacionado y no faltan etiquetas → omitir fila
+            if ($yaRelacionado && empty($etiquetasFaltantes)) {
+                $this->filasOmitidas[] = [
+                    'fila' => $currentRow,
+                    'telefono' => $telefono,
+                    'motivo' => 'Ya existe para este usuario y tiene todas las etiquetas',
+                ];
+                return null;
+            }
 
+            // Relacionar con el usuario si no lo estaba
+            if (!$yaRelacionado) {
+                UserContact::firstOrCreate([
+                    'user_id' => $this->user->id,
+                    'contacto_id' => $contacto->id,
+                ]);
+            }
 
+            // Asociar etiquetas faltantes
+            foreach ($etiquetasFaltantes as $tagId) {
+                try {
+                    $contacto->tags()->attach($tagId, ['user_id' => $this->user->id]);
+                } catch (\Illuminate\Database\QueryException $e) {
+                    if (!str_contains($e->getMessage(), 'Duplicate entry')) {
+                        throw $e;
+                    }
+                }
+            }
 
-            // Agregar teléfono a cache para evitar duplicados en siguientes filas
+            // Guardar teléfono en caché local
             if (!in_array($telefono, $this->existingPhones)) {
                 $this->existingPhones[] = $telefono;
             }
 
-
         } catch (\Exception $e) {
-
-            // REINTENTO SI FUE POR BLOQUEO
             if (str_contains($e->getMessage(), 'Lock wait timeout')) {
                 sleep(1);
                 $row['_retries'] = $intentos + 1;
@@ -215,7 +204,6 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
                     return $this->model($row);
                 }
             }
-
 
             Log::error("Error en importación fila {$currentRow} (Tel: {$telefono}): {$e->getMessage()}", [
                 'trace' => $e->getTraceAsString()
@@ -226,10 +214,9 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
             throw ValidationException::withMessages($validator->errors()->toArray());
         }
 
-
-
         return null;
     }
+
 
     public function batchSize(): int
     {
