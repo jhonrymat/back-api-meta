@@ -89,18 +89,18 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
 
 
         // Validar si ya existe el contacto para el usuario actual
-        $contactoExistente = Contacto::where('telefono', $telefono)
-            ->whereHas('users', fn($q) => $q->where('user_id', $this->user->id))
-            ->exists();
+        // $contactoExistente = Contacto::where('telefono', $telefono)
+        //     ->whereHas('users', fn($q) => $q->where('user_id', $this->user->id))
+        //     ->exists();
 
-        if ($contactoExistente) {
-            $this->filasOmitidas[] = [
-                'fila' => $currentRow,
-                'telefono' => $telefono,
-                'motivo' => 'Ya existe para este usuario',
-            ];
-            return null;
-        }
+        // if ($contactoExistente) {
+        //     $this->filasOmitidas[] = [
+        //         'fila' => $currentRow,
+        //         'telefono' => $telefono,
+        //         'motivo' => 'Ya existe para este usuario',
+        //     ];
+        //     return null;
+        // }
 
 
         // Validar etiquetas
@@ -154,6 +154,20 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
                     'fila' => $currentRow,
                     'telefono' => $telefono,
                     'motivo' => 'No se pudo insertar ni recuperar (posible conflicto de concurrencia)',
+                ];
+                return null;
+            }
+
+            // Verificar si ya está relacionado con este usuario
+            $yaRelacionado = UserContact::where('user_id', $this->user->id)
+                ->where('contacto_id', $contacto->id)
+                ->exists();
+
+            if ($yaRelacionado) {
+                $this->filasOmitidas[] = [
+                    'fila' => $currentRow,
+                    'telefono' => $telefono,
+                    'motivo' => 'Ya existe para este usuario',
                 ];
                 return null;
             }
