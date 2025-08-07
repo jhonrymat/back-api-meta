@@ -4,11 +4,14 @@ namespace App\Http\Controllers;
 
 use Exception;
 use App\Models\Envio;
+use App\Jobs\FinalizeExportJob;
 use App\Models\Message;
 use App\Models\Reporte;
+use App\Jobs\ExportMessagesChunk;
 use App\Jobs\ExportMessages;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Maatwebsite\Excel\Facades\Excel;
@@ -102,19 +105,35 @@ class EstadisticasController extends Controller
 
     public function exportar($id)
     {
-        try {
+        $report = Reporte::findOrFail($id);
+        $chunkSize = 10000;
 
-            $report = Reporte::findOrFail($id);
-            ExportMessages::dispatch($report->fechaInicio, $report->fechaFin, $id, $report->id_telefono)->onQueue('email-queue');
+        // Contar registros: crea un nuevo procedure que solo haga COUNT(*)
+        $total = DB::selectOne('CALL CountMessagesReport(?, ?, ?)', [
+            $report->fechaInicio,
+            $report->fechaFin,
+            $report->id_telefono
+        ])->total ?? 0;
 
-            return response()->json(['status' => 'Exportación iniciada']);
-        } catch (ModelNotFoundException $e) {
-            Log::error("Reporte no encontrado: {$e->getMessage()}", ['exception' => $e]);
-            return response()->json(['error' => 'Reporte no encontrado.'], Response::HTTP_NOT_FOUND);
-        } catch (Exception $e) {
-            Log::error("Error al exportar mensajes: {$e->getMessage()}", ['exception' => $e]);
-            return response()->json(['error' => 'Ocurrió un error al exportar el archivo.'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        $jobs = [];
+        for ($offset = 0; $offset < $total; $offset += $chunkSize) {
+            $jobs[] = new ExportMessagesChunk(
+                $report->fechaInicio,
+                $report->fechaFin,
+                $report->id,
+                $report->id_telefono,
+                $offset,
+                $chunkSize
+            );
         }
+
+        Bus::batch($jobs)
+            ->then(function () use ($id) {
+                FinalizeExportJob::dispatch($id);
+            })
+            ->dispatch();
+
+        return response()->json(['status' => 'Exportación iniciada']);
     }
 
 

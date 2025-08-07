@@ -137,7 +137,7 @@ Route::post('update-status-clocal', [ClocalController::class, 'updateStatus'])->
 //descargar informe
 Route::get('download/{id}', function ($id) {
     $reporte = Reporte::findOrFail($id);
-    $filePath = storage_path('app/' . $reporte->archivo);
+    $filePath = storage_path('app/exports/' . $reporte->archivo);
 
     if (file_exists($filePath)) {
         return response()->download($filePath);
@@ -289,6 +289,9 @@ Route::get('test-notification-job/{userId}', function ($userId) {
     return response()->json(['status' => 'Job encolado correctamente para el usuario ' . $user->name]);
 });
 
+// text rel reporte sendReport
+
+Route::get('sendReport/{reportId}', [MessageController::class, 'sendReport'])->middleware('can:plantillas')->name('plantillas');
 // routes/api.php o web.php
 Route::get('verificar-contacto/{wa_id}', function ($wa_id) {
     $user = auth()->user(); // o Auth::user()

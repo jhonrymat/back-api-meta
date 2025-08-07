@@ -9,32 +9,33 @@
 @stop
 
 @section('content')
-<form id="statisticsForm">
-    @csrf
-    <div class="row">
-        <div class="col-lg-5">
-            <label for="fechaInicio" class="form-label">Fecha y hora inicial</label>
-            <input type="datetime-local" class="form-control" id="fechaInicio" name="fechaInicio" required>
+    <form id="statisticsForm">
+        @csrf
+        <div class="row">
+            <div class="col-lg-5">
+                <label for="fechaInicio" class="form-label">Fecha y hora inicial</label>
+                <input type="datetime-local" class="form-control" id="fechaInicio" name="fechaInicio" required>
+            </div>
+            <div class="col-lg-5">
+                <label for="fechaFin" class="form-label">Fecha y hora final</label>
+                <input type="datetime-local" class="form-control" id="fechaFin" name="fechaFin" required>
+            </div>
+            <div class="col-lg-5">
+                <label for="selectPlantilla">Seleccione un número disponible</label>
+                <select id="selectPlantilla" name="selectPlantilla" class="form-select form-control mb-3" required>
+                    <option value="">Selecciona un Número</option>
+                    @foreach ($numeros as $numero)
+                        <option value="{{ $numero->id_telefono }}">{{ $numero->nombre }} - {{ $numero->numero }} -
+                            {{ $numero->aplicacion->nombre }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-lg-2">
+                <br>
+                <button type="submit" class="btn btn-primary">Enviar</button>
+            </div>
         </div>
-        <div class="col-lg-5">
-            <label for="fechaFin" class="form-label">Fecha y hora final</label>
-            <input type="datetime-local" class="form-control" id="fechaFin" name="fechaFin" required>
-        </div>
-        <div class="col-lg-5">
-            <label for="selectPlantilla">Seleccione un número disponible</label>
-            <select id="selectPlantilla" name="selectPlantilla" class="form-select form-control mb-3" required>
-                <option value="">Selecciona un Número</option>
-                @foreach ($numeros as $numero)
-                    <option value="{{ $numero->id_telefono }}">{{ $numero->nombre }} - {{ $numero->numero }} - {{ $numero->aplicacion->nombre }}</option>
-                @endforeach
-            </select>
-        </div>
-        <div class="col-lg-2">
-            <br>
-            <button type="submit" class="btn btn-primary">Enviar</button>
-        </div>
-    </div>
-</form>
+    </form>
     <br>
     <section class="content">
         <div class="container-fluid">
@@ -327,9 +328,10 @@
                                 'Fallidos',
                             ],
                             datasets: [{
-                                data: [response.sentCount, response.deliveredCount, response.failedCount ],
-                                backgroundColor: ['#00c0ef', '#f39c12', '#f50854'
+                                data: [response.sentCount, response.deliveredCount,
+                                    response.failedCount
                                 ],
+                                backgroundColor: ['#00c0ef', '#f39c12', '#f50854'],
                             }]
                         };
                         var donutOptions = {
@@ -393,25 +395,21 @@
                             Swal.showLoading();
                         }
                     }).fail(function(xhr, status, error) {
-                        // Manejo de errores
-                        var errorMessage = 'No se pudo iniciar la exportación';
+                        var errorMessage = 'No se pudo iniciar la exportación.';
                         if (xhr.responseJSON && xhr.responseJSON.error) {
-                            errorMessage += ': ' + xhr.responseJSON.error;
+                            errorMessage += ' ' + xhr.responseJSON.error;
                         }
                         Swal.fire('Error', errorMessage, 'error');
                     });
                 },
                 allowOutsideClick: () => !Swal.isLoading()
             }).then((result) => {
-                if (result.value) {
+                if (result.isConfirmed) {
                     Swal.fire(
-                        '¡Exportación Finalizada!',
-                        'Ya la puedes descargar y recibirás el link de descarga a tu WhatsApp.',
+                        '✅ Exportación programada',
+                        'Estamos generando tu archivo. Recibirás un enlace por WhatsApp o correo cuando esté listo.',
                         'success'
-                    ).then(() => {
-                        location
-                            .reload(); // También recarga en caso de que el usuario cierre el SweetAlert manualmente
-                    });
+                    );
                 } else if (result.dismiss === Swal.DismissReason.cancel) {
                     Swal.fire(
                         'Cancelado',

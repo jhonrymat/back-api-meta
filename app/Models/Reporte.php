@@ -12,7 +12,7 @@ class Reporte extends Model
 
     public function archivoExiste()
     {
-        return file_exists(storage_path('app/' . $this->archivo));
+        return file_exists(storage_path('app/exports/' . $this->archivo));
     }
 
     public function users()

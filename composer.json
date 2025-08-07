@@ -21,6 +21,7 @@
         "pusher/pusher-php-server": "^7.2",
         "rappasoft/laravel-livewire-tables": "^3.4",
         "spatie/laravel-permission": "^6.9",
+        "spatie/simple-excel": "^3.7",
         "symfony/css-selector": "^7.1",
         "tijsverkoyen/css-to-inline-styles": "^2.2",
         "yajra/laravel-datatables-oracle": "^10.11"

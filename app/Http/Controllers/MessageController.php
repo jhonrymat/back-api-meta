@@ -10,6 +10,7 @@ use App\Models\Envio;
 use App\Events\Webhook;
 use App\Models\Message;
 use App\Models\Numeros;
+use App\Models\Reporte;
 use App\Models\Contacto;
 use PhpParser\Node\Expr;
 use App\Jobs\SendMessage;
@@ -27,8 +28,8 @@ use App\Jobs\SendNotificationJob;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Auth;
 
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Storage;
@@ -248,53 +249,61 @@ class MessageController extends Controller
 
     public function sendReport($id_report)
     {
+        // obtener id_telefono del reporte
+        $reporte = Reporte::findOrFail($id_report);
+        $telefono = $reporte->id_telefono;
+
+        // obtener el número y su aplicación relacionada
+        $numero = Numeros::where('id_telefono', $telefono)->with('aplicacion', 'users')->firstOrFail();
+        $aplicacion = $numero->aplicacion;
+        $user = $numero->users()->first(); // puede haber varios usuarios, aquí se toma el primero
+
+        if (!$aplicacion || !$user) {
+            Log::warning("No se encontró aplicación o usuario para el teléfono {$telefono}");
+            return;
+        }
+
         try {
-            // Verificar si el usuario está autenticado
-            if (Auth::check()) {
-                // Obtener el usuario autenticado
-                $user = Auth::user();
-                // Acceder a la información del usuario
+            $token = $aplicacion->token_api;
+            $phoneId = $telefono;
+            $version = 'v22.0';
+            $payload = [
+                'messaging_product' => 'whatsapp',
+                'to' => $user->phone,
+                'type' => 'template',
+                "template" => [
+                    "name" => "reporte_mensual",
+                    "language" => [
+                        "code" => "es"
+                    ],
+                    "components" => [
+                        [
+                            "type" => "header",
+                            "parameters" => [
+                                [
+                                    "type" => "text",
+                                    "text" => $user->name
 
-                $token = 'EAAVGPBd0gvkBO7kWVSz5E8tTEZBcwC86fkK3JwsUeYCxZA04aHWaOyvkpmQu94lZC6BViNmZAZA9jHilijZA1nFXdDqrlXGItIUFikMY4JM0tNJlzBGAOkOXZA1lgH4ZAd7y37WSqYXLggZAYu4x5nzZCtsi2amDY3ZBnIngGXVAwaZCTp0UOsvyIWE35hTYE10wcFZBH8nXA2E6p4M2GkRWD';
-                $phoneId = '131481643386780';
-                $version = 'v22.0';
-                $payload = [
-                    'messaging_product' => 'whatsapp',
-                    'to' => $user->phone,
-                    'type' => 'template',
-                    "template" => [
-                        "name" => "reporte_mensual",
-                        "language" => [
-                            "code" => "es"
+                                ]
+                            ]
                         ],
-                        "components" => [
-                            [
-                                "type" => "header",
-                                "parameters" => [
-                                    [
-                                        "type" => "text",
-                                        "text" => $user->name
-
-                                    ]
+                        [
+                            "type" => "button",
+                            'index' => '0',
+                            "sub_type" => "url",
+                            "parameters" => [
+                                [
+                                    "type" => "text",
+                                    "text" => $id_report
                                 ]
-                            ],
-                            [
-                                "type" => "button",
-                                'index' => '0',
-                                "sub_type" => "url",
-                                "parameters" => [
-                                    [
-                                        "type" => "text",
-                                        "text" => $id_report
-                                    ]
-                                ]
-                            ],
-                        ]
+                            ]
+                        ],
                     ]
-                ];
-                $message = Http::withToken($token)->post('https://graph.facebook.com/' . $version . '/' . $phoneId . '/messages', $payload)->throw()->json();
-                Log::info('Mensaje enviado correctamente: ', ['data' => $message]);
-            }
+                ]
+            ];
+            $message = Http::withToken($token)->post('https://graph.facebook.com/' . $version . '/' . $phoneId . '/messages', $payload)->throw()->json();
+            Log::info('Mensaje enviado correctamente: ', ['data' => $message]);
+
         } catch (Exception $e) {
             Log::error('Error al enviar mensaje de prueba a jhon: ' . $e->getMessage());
         }
