@@ -60,7 +60,7 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
             ->pluck('telefono')
             ->toArray();
     }
- 
+
 
     protected function normalizeName($name)
     {
@@ -85,16 +85,23 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
         $currentRow = $this->startRow() + $this->currentRowOffset++;
 
         $telefono = $row['telefono'];
+        $intentos = $row['_retries'] ?? 0;
+
 
         // Validar si ya existe el contacto para el usuario actual
-        if (in_array($telefono, $this->existingPhones)) {
+        $contactoExistente = Contacto::where('telefono', $telefono)
+            ->whereHas('users', fn($q) => $q->where('user_id', $this->user->id))
+            ->exists();
+
+        if ($contactoExistente) {
             $this->filasOmitidas[] = [
                 'fila' => $currentRow,
                 'telefono' => $telefono,
-                'motivo' => 'Ya existe en la base de datos',
+                'motivo' => 'Ya existe para este usuario',
             ];
             return null;
         }
+
 
         // Validar etiquetas
         $tagIds = [];
@@ -142,6 +149,16 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
                 }
             }
 
+            // ⬇️ AQUÍ VA
+            if (!$contacto) {
+                $this->filasOmitidas[] = [
+                    'fila' => $currentRow,
+                    'telefono' => $telefono,
+                    'motivo' => 'No se pudo insertar ni recuperar (posible conflicto de concurrencia)',
+                ];
+                return null;
+            }
+
 
 
             // Asociar al usuario si aún no lo tiene
@@ -162,7 +179,10 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
 
 
             // Agregar teléfono a cache para evitar duplicados en siguientes filas
-            $this->existingPhones[] = $telefono;
+            if (!in_array($telefono, $this->existingPhones)) {
+                $this->existingPhones[] = $telefono;
+            }
+
 
             DB::commit();
         } catch (\Exception $e) {
@@ -170,9 +190,13 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
 
             // REINTENTO SI FUE POR BLOQUEO
             if (str_contains($e->getMessage(), 'Lock wait timeout')) {
-                sleep(1); // espera un segundo
-                return $this->model($row); // reintenta el guardado de esta fila
+                sleep(1);
+                $row['_retries'] = $intentos + 1;
+                if ($row['_retries'] <= 3) {
+                    return $this->model($row);
+                }
             }
+
 
             Log::error("Error en importación fila {$currentRow} (Tel: {$telefono}): {$e->getMessage()}", [
                 'trace' => $e->getTraceAsString()
