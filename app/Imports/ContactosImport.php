@@ -169,18 +169,19 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
 
             if (!empty($tagIds)) {
                 foreach ($tagIds as $tagId) {
-                    $existeRelacion = DB::table('contacto_tag')
-                        ->where('contacto_id', $contacto->id)
-                        ->where('tag_id', $tagId)
-                        ->where('user_id', $this->user->id)
-                        ->exists();
-
-                    if (!$existeRelacion) {
+                    try {
                         $contacto->tags()->attach($tagId, ['user_id' => $this->user->id]);
+                    } catch (\Illuminate\Database\QueryException $e) {
+                        if (str_contains($e->getMessage(), 'Duplicate entry')) {
+                            // Ya fue insertado por otro job, ignorar
+                            continue;
+                        } else {
+                            throw $e; // Otro error, relanzar
+                        }
                     }
-
                 }
             }
+
 
 
 
