@@ -291,7 +291,7 @@ Route::get('test-notification-job/{userId}', function ($userId) {
 
 // text rel reporte sendReport
 
-Route::get('sendReport/{reportId}', [MessageController::class, 'sendReport'])->middleware('can:plantillas')->name('plantillas');
+Route::get('sendReport/{reportId}', [MessageController::class, 'sendReport'])->middleware('can:plantillas')->name('sendReport');
 // routes/api.php o web.php
 Route::get('verificar-contacto/{wa_id}', function ($wa_id) {
     $user = auth()->user(); // o Auth::user()
