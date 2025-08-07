@@ -126,7 +126,6 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
         }
 
         try {
-            DB::beginTransaction();
 
             $contacto = Contacto::where('telefono', $telefono)->first();
 
@@ -184,9 +183,7 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
             }
 
 
-            DB::commit();
         } catch (\Exception $e) {
-            DB::rollBack();
 
             // REINTENTO SI FUE POR BLOQUEO
             if (str_contains($e->getMessage(), 'Lock wait timeout')) {
