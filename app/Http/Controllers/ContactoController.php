@@ -309,9 +309,9 @@ class ContactoController extends Controller
 
     public function uploadUsers(Request $request)
     {
-        $request->validate([
-            'file' => 'required|file|mimes:xlsx,xls,csv|max:10240',
-        ]);
+        // $request->validate([
+        //     'file' => 'required|file|mimes:xlsx,xls,csv|max:10240',
+        // ]);
 
         // Guardar archivo temporalmente
         $path = $request->file('file')->store('importaciones_temp');
