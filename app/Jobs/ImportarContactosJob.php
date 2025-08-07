@@ -39,6 +39,10 @@ class ImportarContactosJob implements ShouldQueue
             $importador = new ContactosImport($this->userId);
             Excel::import($importador, $this->filePath);
 
+            if (!empty($importador->getFilasOmitidas())) {
+                Storage::put("importaciones/omitidas_{$this->userId}.json", json_encode($importador->getFilasOmitidas()));
+            }
+
         } catch (ValidationException $e) {
             Storage::put("importaciones/errores_{$this->userId}.json", json_encode($e->errors()));
             throw $e;

@@ -60,12 +60,7 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
             ->pluck('telefono')
             ->toArray();
     }
-    public function __destruct()
-    {
-        if (!empty($this->filasOmitidas)) {
-            Storage::put("importaciones/omitidas_{$this->user->id}.json", json_encode($this->filasOmitidas));
-        }
-    }
+ 
 
     protected function normalizeName($name)
     {
@@ -126,15 +121,28 @@ class ContactosImport implements ToModel, WithHeadingRow, WithValidation, WithBa
         try {
             DB::beginTransaction();
 
-            $contacto = Contacto::firstOrCreate(
-                ['telefono' => $telefono],
-                [
-                    'nombre' => $row['nombre'],
-                    'apellido' => $row['apellido'],
-                    'correo' => $row['correo'],
-                    'notas' => $row['notas'] ?? null,
-                ]
-            );
+            $contacto = Contacto::where('telefono', $telefono)->first();
+
+            if (!$contacto) {
+                try {
+                    $contacto = Contacto::create([
+                        'telefono' => $telefono,
+                        'nombre' => $row['nombre'],
+                        'apellido' => $row['apellido'],
+                        'correo' => $row['correo'],
+                        'notas' => $row['notas'] ?? null,
+                    ]);
+                } catch (\Illuminate\Database\QueryException $e) {
+                    if (str_contains($e->getMessage(), 'Duplicate entry')) {
+                        // Alguien lo insertó justo antes → lo buscamos de nuevo
+                        $contacto = Contacto::where('telefono', $telefono)->first();
+                    } else {
+                        throw $e;
+                    }
+                }
+            }
+
+
 
             // Asociar al usuario si aún no lo tiene
             UserContact::firstOrCreate([
