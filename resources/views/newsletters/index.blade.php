@@ -44,8 +44,8 @@
                                         No
                                     @endif
                                 </td>
-                                <td>{{ $newsletter->created_at->format('d/m/Y H:i') }}</td>
-                                <td>
+                                <td>{{ optional($newsletter->created_at)->format('d/m/Y H:i') }}</td>
+                                <td class="d-flex flex-wrap gap-1">
                                     <button class="btn btn-success btn-sm send-test-btn" data-bs-toggle="modal"
                                         data-bs-target="#sendTestModal"
                                         data-url="{{ route('newsletters.sendTest', $newsletter->id) }}">
@@ -55,7 +55,8 @@
                                         data-bs-target="#sendNewsletterModal"
                                         data-url="{{ route('newsletters.send', $newsletter->id) }}"
                                         data-groups="{{ json_encode($newsletter->groups->pluck('id')) }}"
-                                        data-tags="{{ json_encode($newsletter->tags->pluck('id')) }}">
+                                        data-tags="{{ json_encode($newsletter->tags->pluck('id')) }}"
+                                        data-id="{{ $newsletter->id }}">
                                         Enviar Boletín
                                     </button>
                                     <a href="{{ route('newsletters.edit', $newsletter->id) }}"
@@ -63,15 +64,15 @@
                                     <button class="btn btn-danger btn-sm delete-btn" data-id="{{ $newsletter->id }}"
                                         data-url="{{ route('newsletters.destroy', $newsletter->id) }}">Eliminar</button>
                                     @if ($newsletter->is_sent && !$newsletter->is_cancelled)
-                                        <form method="POST" action="{{ route('newsletters.cancel', $newsletter) }}">
+                                        <form method="POST" action="{{ route('newsletters.cancel', $newsletter) }}"
+                                            class="ms-1">
                                             @csrf
                                             @method('PATCH')
                                             <button type="submit" class="btn btn-danger btn-sm">Cancelar envío</button>
                                         </form>
                                     @elseif ($newsletter->is_cancelled)
-                                        <span class="text-danger">Cancelado</span>
+                                        <span class="text-danger ms-2">Cancelado</span>
                                     @endif
-
                                 </td>
                             </tr>
                         @empty
@@ -83,7 +84,7 @@
                 </table>
                 {{-- Paginación --}}
                 <div class="d-flex justify-content-center">
-                    {{ $newsletters->withQueryString()->links('pagination::bootstrap-5') }}
+                    {{ $newsletters->withQueryString()->links('pagination::simple-bootstrap-5') }}
                 </div>
             </div>
         </div>
@@ -102,7 +103,7 @@
                     <div class="modal-body">
                         <div class="form-group mb-3">
                             <label for="test_name">Nombre de Prueba</label>
-                            <input type="name" name="test_name" id="test_name" class="form-control"
+                            <input type="text" name="test_name" id="test_name" class="form-control"
                                 placeholder="Ingresa un nombre" required>
                         </div>
                         <div class="form-group mb-3">
@@ -111,8 +112,8 @@
                                 placeholder="Ingresa un correo" required>
                         </div>
                         <div class="form-group mb-3">
-                            <label for="email_template_id">Seleccionar Plantilla</label>
-                            <select name="email_template_id" id="email_template_id" class="form-control" required>
+                            <label for="email_template_id_test">Seleccionar Plantilla</label>
+                            <select name="email_template_id" id="email_template_id_test" class="form-control" required>
                                 <option value="">Seleccione una plantilla</option>
                                 @foreach ($emailTemplates as $template)
                                     <option value="{{ $template->id }}">{{ $template->name }}</option>
@@ -142,7 +143,7 @@
 
                     <div class="modal-body">
                         <p>Selecciona una plantilla de correo:</p>
-                        <select name="email_template_id" id="email_template_id" class="form-control" required>
+                        <select name="email_template_id" id="email_template_id_send" class="form-control" required>
                             <option value="">-- Seleccionar Plantilla --</option>
                             @foreach ($emailTemplates as $template)
                                 <option value="{{ $template->id }}">{{ $template->name }}</option>
@@ -187,8 +188,7 @@
     <script>
         document.querySelectorAll('.delete-btn').forEach(button => {
             button.addEventListener('click', function(e) {
-                e.preventDefault(); // Evitar comportamiento por defecto
-                const newsletterId = this.getAttribute('data-id');
+                e.preventDefault();
                 const url = this.getAttribute('data-url');
                 Swal.fire({
                     title: '¿Estás seguro?',
@@ -201,28 +201,72 @@
                     cancelButtonText: 'Cancelar'
                 }).then((result) => {
                     if (result.isConfirmed) {
-                        // Crear un formulario dinámico para enviar la solicitud
                         const form = document.createElement('form');
                         form.method = 'POST';
                         form.action = url;
-                        // Agregar tokens de CSRF y DELETE
-                        const csrfToken = document.createElement('input');
-                        csrfToken.type = 'hidden';
-                        csrfToken.name = '_token';
-                        csrfToken.value = '{{ csrf_token() }}';
-                        form.appendChild(csrfToken);
-                        const methodInput = document.createElement('input');
-                        methodInput.type = 'hidden';
-                        methodInput.name = '_method';
-                        methodInput.value = 'DELETE';
-                        form.appendChild(methodInput);
-                        // Agregar el formulario al documento y enviarlo
+
+                        const csrf = document.createElement('input');
+                        csrf.type = 'hidden';
+                        csrf.name = '_token';
+                        csrf.value = '{{ csrf_token() }}';
+                        form.appendChild(csrf);
+
+                        const method = document.createElement('input');
+                        method.type = 'hidden';
+                        method.name = '_method';
+                        method.value = 'DELETE';
+                        form.appendChild(method);
+
                         document.body.appendChild(form);
                         form.submit();
                     }
                 });
             });
         });
+    </script>
+
+    {{-- Modal: Enviar prueba (set action) --}}
+    <script>
+        document.querySelectorAll('.send-test-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const url = this.getAttribute('data-url');
+                document.getElementById('sendTestForm').setAttribute('action', url);
+            });
+        });
+    </script>
+
+    {{-- Modal: Enviar boletín (set action + calcular destinatarios vía fetch) --}}
+    <script>
+        document.querySelectorAll('.send-newsletter-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const url = this.getAttribute('data-url');
+                const id = this.getAttribute('data-id');
+                const form = document.getElementById('sendNewsletterForm');
+                const counter = document.getElementById('recipient-count');
+
+                form.setAttribute('action', url);
+                counter.innerText = '...';
+
+                fetch(`newsletters/${id}/recipients/count`)
+                    .then(r => r.json())
+                    .then(data => {
+                        counter.innerText = (data && typeof data.count !== 'undefined') ? data.count :
+                            0;
+                    })
+                    .catch(() => {
+                        counter.innerText = 0;
+                    });
+            });
+        });
+
+        // Mostrar/ocultar fecha programada
+        document.querySelectorAll('input[name="send_type"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                const schedule = document.getElementById('schedule-fields');
+                schedule.style.display = (this.value === 'scheduled') ? 'block' : 'none';
+            });
+        });
+
         @if (session('success'))
             Swal.fire({
                 title: '¡Éxito!',
@@ -232,56 +276,5 @@
             });
         @endif
     </script>
-    <script>
-        document.querySelectorAll('.send-test-btn').forEach(button => {
-            button.addEventListener('click', function() {
-                const url = this.getAttribute('data-url');
-                const form = document.getElementById('sendTestForm');
-                form.setAttribute('action', url); // Actualiza la acción del formulario
-            });
-        });
-    </script>
-    @if (session('success'))
-        <script>
-            Swal.fire({
-                title: '¡Éxito!',
-                text: "{{ session('success') }}",
-                icon: 'success',
-                confirmButtonText: 'Aceptar'
-            });
-        </script>
-    @endif
-    <script>
-        document.querySelectorAll('.send-newsletter-btn').forEach(button => {
-            button.addEventListener('click', function() {
-                const url = this.getAttribute('data-url');
-                document.getElementById('sendNewsletterForm').setAttribute('action', url);
-
-                const groups = JSON.parse(this.getAttribute('data-groups') || '[]');
-                const tags = JSON.parse(this.getAttribute('data-tags') || '[]');
-
-                let recipientCount = 0;
-                groups.forEach(groupId => {
-                    recipientCount += document.querySelector(`#group-${groupId}-count`)
-                        ?.innerText || 0;
-                });
-                tags.forEach(tagId => {
-                    recipientCount += document.querySelector(`#tag-${tagId}-count`)?.innerText || 0;
-                });
-
-                document.getElementById('recipient-count').innerText = recipientCount;
-            });
-        });
-        document.querySelector('#sendNewsletterModal').addEventListener('show.bs.modal', function(event) {
-            const newsletterId = event.relatedTarget.getAttribute('data-id');
-            const url = `/newsletters/${newsletterId}/recipients/count`; // Ruta para contar destinatarios
-
-            fetch(url)
-                .then(response => response.json())
-                .then(data => {
-                    document.querySelector('#recipient-count').innerText =
-                        `Se enviará a ${data.count} destinatarios.`;
-                });
-        });
-    </script>
+    
 @endsection

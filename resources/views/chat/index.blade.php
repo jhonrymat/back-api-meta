@@ -161,6 +161,7 @@
     <script src="//cdn.datatables.net/responsive/2.2.1/js/dataTables.responsive.min.js"></script>
     <script src="//cdn.datatables.net/responsive/2.2.1/js/responsive.bootstrap4.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script src="{{ asset('js/date-utils.js') }}"></script>
 
@@ -541,74 +542,92 @@
                             id_phone: idTelefono,
                         },
                         success: function(response) {
-                            contactPageUrl = response.nextPageUrl; // <-- AQUI ACTUALIZAS LA URL
-                            Swal.close(); // Cierra el SweetAlert de carga
-                            if (response.success) {
-                                $("#miModal").modal('hide');
-                                // No olvides añadir aquí el código para manejar la selección inicial si es necesario
-                                $.each(response.data, function(index, elem) {
-                                    // Decidir el ícono según el estado del mensaje
+                            contactPageUrl = response.nextPageUrl || null;
+                            Swal.close();
 
-                                    let iconHTML = getStatusIcon(elem.status);
-                                    //agregar a variables globales pra reutilizar:
-                                    //agregar a variables globales pra reutilizar:
-                                    NEXT.waId = elem.wa_id;
-                                    NEXT.phoneId = elem.phone_id;
-                                    // Clase CSS condicional si tiene mensajes nuevos
-                                    const isUnread = elem.tiene_mensajes_nuevos ?
-                                        'fw-bold text-dark' : '';
-                                    const messageClass = elem.tiene_mensajes_nuevos ?
-                                        'fw-bold text-dark' : '';
-
-                                    // Construir el HTML para cada elemento del chat, incluyendo un data-id
-                                    //lista de chat de perfiles disponibles
-                                    var chatItemHtml = `<div class="chat-list-item d-flex flex-row w-100 p-2 border-bottom" data-wa-id="${elem.wa_id || elem.telefono}" data-id="${elem.id}" onclick="generateMessageArea2('${elem.wa_id || elem.telefono}', '${idTelefono}')">
-                                        <img src="{{ asset('images/user.jpg') }}" alt="Profile Photo" class="img-fluid rounded-circle mr-2" style="height:50px;">
-                                        <div class="w-50">
-                                            <div class="name ${isUnread}">${elem.nombre}</div>
-                                            <div class="small last-message ${messageClass}">
-                                                ${(elem.outgoing === 1 && (elem.body || elem.tiene_mensajes_nuevos)) ? getStatusIcon(elem.status) : ''}
-                                                ${(() => {
-                                                    switch (elem.type) {
-                                                        case 'audio':
-                                                            return '🔊 <em>[Audio]</em>';
-                                                        case 'image':
-                                                            return '🖼️ <em>[Imagen]</em>';
-                                                        case 'video':
-                                                            return '🎥 <em>[Video]</em>';
-                                                        case 'document':
-                                                            return '📄 <em>[Documento]</em>';
-                                                        case 'sticker':
-                                                            return '🌟 <em>[Sticker]</em>';
-                                                        case 'location':
-                                                            return '📍 <em>[Ubicación]</em>';
-                                                        case 'contact':
-                                                            return '👤 <em>[Contacto]</em>';
-                                                        case 'other':
-                                                            return '👤 <em>[Otro]</em>';
-                                                        case 'text':
-                                                            return elem.body || 'Click para ver mensajes';
-                                                        default:
-                                                            return elem.body || 'Click para ver mensajes';
-                                                    }
-                                                })()}
-                                            </div>
-                                        </div>
-                                        <div class="flex-grow-1 text-right">
-                                            <div class="small">${mDate(elem.updated_at).chatListFormat()}</div>
-                                            <div class="small">${(elem.telefono)}</div>
-                                        </div>
-                                    </div>`;
-
-
-                                    // Agregar el HTML al div con ID 'chat-list'
-                                    $("#chat-list").append(chatItemHtml);
-                                });
-
-                            } else {
-                                Swal.fire('Error', 'No se pudieron cargar los chats.',
+                            if (!response || response.success !== true || !Array.isArray(
+                                    response.data)) {
+                                return Swal.fire('Error', 'Respuesta inesperada del servidor.',
                                     'error');
                             }
+
+                            $("#miModal").modal('hide');
+
+                            response.data.forEach(function(elem) {
+                                // Defaults defensivos
+                                const msgType = elem.type || 'text';
+                                const body = elem.body || 'Click para ver mensajes';
+                                const outgoing = Number(elem.outgoing) === 1;
+                                const status = elem.status || null;
+                                const waId = elem.wa_id || elem.telefono;
+                                const stamp = elem.created_at || elem
+                                    .contact_updated_at || new Date().toISOString();
+                                const phoneId = elem.phone_id || AppConfig.idTelefono ||
+                                    null;
+
+                                // Exponer globales sólo si existen
+                                if (waId) NEXT.waId = waId;
+                                if (phoneId) NEXT.phoneId = phoneId;
+
+                                // Icono si hay mensaje saliente con estado
+                                const statusIcon = outgoing && status ? getStatusIcon(
+                                    status) : '';
+
+                                const isUnreadClass = elem.tiene_mensajes_nuevos ?
+                                    'fw-bold text-dark' : '';
+                                const lastMsgText = (() => {
+                                    switch (msgType) {
+                                        case 'audio':
+                                            return '🔊 <em>[Audio]</em>';
+                                        case 'image':
+                                            return '🖼️ <em>[Imagen]</em>';
+                                        case 'video':
+                                            return '🎥 <em>[Video]</em>';
+                                        case 'document':
+                                            return '📄 <em>[Documento]</em>';
+                                        case 'sticker':
+                                            return '🌟 <em>[Sticker]</em>';
+                                        case 'location':
+                                            return '📍 <em>[Ubicación]</em>';
+                                        case 'contact':
+                                            return '👤 <em>[Contacto]</em>';
+                                        default:
+                                            return body;
+                                    }
+                                })();
+
+                                // MDate robusto (si falla, mostramos hora “ahora”)
+                                let prettyDate = '';
+                                try {
+                                    prettyDate = mDate(stamp).chatListFormat();
+                                } catch (e) {
+                                    prettyDate = mDate(new Date()).chatListFormat();
+                                }
+
+                                const chatItemHtml = `
+        <div class="chat-list-item d-flex flex-row w-100 p-2 border-bottom"
+             data-wa-id="${waId}" data-id="${elem.id}"
+             onclick="generateMessageArea2('${waId}', '${phoneId || ''}')">
+            <img src="{{ asset('images/user.jpg') }}" class="img-fluid rounded-circle mr-2" style="height:50px;">
+            <div class="w-50">
+                <div class="name ${isUnreadClass}">${elem.nombre || '(Sin nombre)'}</div>
+                <div class="small last-message ${isUnreadClass}">
+                    ${statusIcon} ${lastMsgText}
+                </div>
+            </div>
+            <div class="flex-grow-1 text-right">
+                <div class="small">${prettyDate}</div>
+                <div class="small">${elem.telefono || ''}</div>
+            </div>
+        </div>`;
+
+                                $("#chat-list").append(chatItemHtml);
+                            });
+                        },
+                        error: function(xhr, status, error) {
+                            Swal.close();
+                            Swal.fire('Error', 'Ocurrió un error al cargar los chats: ' + (
+                                error || 'desconocido'), 'error');
                         },
                         error: function(xhr, status, error) {
                             Swal.close();

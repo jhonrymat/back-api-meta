@@ -18,7 +18,7 @@
             <div class="card-body">
                 <div>
                     <label for="selectPlantilla">Seleccione un numero disponible</label>
-                    <select id="selectPlantilla" class="form-select form-control mb-3" required>
+                    <select id="selectPlantilla" class="form-select mb-3" required>
                         <option value="">Selecciona un Número</option>
                         @foreach ($numeros as $numero)
                             <option value="{{ $numero->id }}" data-id_telefono="{{ $numero->id_telefono }}"
@@ -32,7 +32,7 @@
 
                 <div>
                     <label for="templatesSelect">Seleccione una plantilla disponible</label>
-                    <select id="templatesSelect" class="form-select form-control mb-3" required>
+                    <select id="templatesSelect" class="form-select mb-3" required>
                         <option value="">Selecciona una plantilla</option>
                         <!-- Las opciones se cargarán aquí dinámicamente -->
                     </select>
@@ -40,7 +40,7 @@
                 @hasanyrole('ContratacionL|Administrador')
                     <div>
                         <label for="distintivoSelect">Seleccione un distintivo</label>
-                        <select id="distintivoSelect" class="form-select form-control mb-3" required>
+                        <select id="distintivoSelect" class="form-select mb-3" required>
                             <option value="">Esto servirá para los reportes</option>
                             @foreach ($distintivos as $dis)
                                 <option value="{{ $dis->id }}">
@@ -51,13 +51,12 @@
                     </div>
                 @endhasanyrole
                 <div>
-                    <label for="selectTag">Seleccione un grupo para enviar</label>
+                    <label for="etiqueta">Seleccione un grupo para enviar</label>
                     <div>
-                        <select id="etiqueta" name="etiqueta[]" class="form-select form-control mb-3" multiple>
+                        <select id="etiqueta" name="etiqueta[]" class="form-select mb-3" multiple>
                             <option value="">Selecciona una Etiqueta</option>
                             @foreach ($tags as $tag)
-                                <option value="{{ $tag->id }}"
-                                    data-numeros="{{ implode("\n", $tag->contactos->pluck('telefono')->toArray()) }}">
+                                <option value="{{ $tag->id }}" data-numeros='@json($tag->contactos->pluck('telefono'))'>
                                     {{ $tag->nombre }} - {{ $tag->contactos->count() }}
                                 </option>
                             @endforeach
@@ -67,7 +66,7 @@
 
                 <div class="form-group">
                     <label for="exampleFormControlTextarea1">Lista de contactos</label>
-                    <textarea class="form-control" id="exampleFormControlTextarea1" rows="3" required></textarea>
+                    <textarea class="form-control" id="exampleFormControlTextarea1" rows="5" required></textarea>
                 </div>
 
                 <div class="mt-3">
@@ -103,28 +102,25 @@
 
 @section('css')
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
     <link rel="stylesheet" href="{{ asset('css/drag-and-drop.css') }}">
 @stop
 
 @section('js')
     <script src="https://code.jquery.com/jquery-3.7.0.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
 
     <script>
         function findPlaceholders(text) {
-            const regexp = /{{ '{' }}\d+{{ '}' }}/g;
+            const regexp = /\{\{\s*\d+\s*\}\}/g;
             const matches = [];
-            let match;
-            while ((match = regexp.exec(text)) !== null) {
+            let m;
+            while ((m = regexp.exec(text)) !== null) {
                 matches.push({
-                    text: match[0],
+                    text: m[0],
                     value: ''
                 });
             }
             return matches;
-        };
+        }
     </script>
     <script>
         function contienePlantilla(texto) {
@@ -135,53 +131,82 @@
             return regex.test(texto);
         }
     </script>
-      <script>
-        $(document).ready(function () {
-            $('#etiqueta').change(function () {
-                updateContactList();
-            });
+    <script>
+        $(document).ready(function() {
 
-            $('input[name="eliminarDuplicados"]').change(function () {
-                updateContactList();
-            });
+            $('#etiqueta').on('change', updateContactList);
+            $('input[name="eliminarDuplicados"]').on('change', updateContactList);
 
             function updateContactList() {
-                var selectedTag = $('#etiqueta option:selected');
-                var numeros = selectedTag.map(function () {
-                    return $(this).data('numeros');
-                }).get().join('\n');
+                const selected = $('#etiqueta option:selected');
 
-                var numerosArray = numeros.split('\n').filter(num => num.trim() !== ""); // Convertir a array y limpiar espacios
-                var eliminarDuplicados = $('input[name="eliminarDuplicados"]:checked').val() === 'si';
-
-                if (eliminarDuplicados) {
-                    let numerosUnicos = [];
-                    let numerosDuplicados = [];
-
-                    numerosArray.forEach(num => {
-                        if (numerosUnicos.includes(num)) {
-                            numerosDuplicados.push(num);
-                        } else {
-                            numerosUnicos.push(num);
-                        }
-                    });
-
-                    $('#exampleFormControlTextarea1').val(numerosUnicos.join('\n'));
-
-                    if (numerosDuplicados.length > 0) {
-                        Swal.fire({
-                            title: "Números Eliminados",
-                            text: "Se eliminaron los siguientes números duplicados:\n" + [...new Set(numerosDuplicados)].join('\n'),
-                            icon: "info",
-                            confirmButtonText: "Entendido"
-                        });
+                // 1) Construir el arreglo 'arr' desde los data-numeros (JSON)
+                let arr = [];
+                selected.each(function() {
+                    const raw = $(this).attr('data-numeros');
+                    if (!raw) return;
+                    try {
+                        const list = JSON.parse(raw); // array real
+                        arr.push(...list);
+                    } catch (e) {
+                        console.error("Error parseando data-numeros", raw, e);
                     }
-                } else {
-                    $('#exampleFormControlTextarea1').val(numeros);
+                });
+
+                // 2) Limpieza básica
+                arr = arr.map(s => String(s || '').trim()).filter(Boolean);
+
+                // 3) Si no se eliminan duplicados, solo pintar y salir
+                const eliminar = $('input[name="eliminarDuplicados"]:checked').val() === 'si';
+                if (!eliminar) {
+                    $('#exampleFormControlTextarea1').val(arr.join('\n'));
+                    return;
+                }
+
+                // 4) Normalizar: comparar por últimos 10 dígitos (CO)
+                const norm = s => {
+                    const digits = String(s).replace(/\D/g, '');
+                    return digits.slice(-10); // clave de comparación
+                };
+
+                // 5) Agrupar por clave normalizada
+                const buckets = new Map(); // clave -> [originales]
+                for (const n of arr) {
+                    const k = norm(n);
+                    if (!k) continue; // ignora líneas sin dígitos suficientes
+                    if (!buckets.has(k)) buckets.set(k, []);
+                    buckets.get(k).push(n);
+                }
+
+                // 6) Separar únicos y repetidos
+                const uniques = [];
+                const removed = [];
+                for (const [, originals] of buckets) {
+                    uniques.push(originals[0]); // se queda el primero
+                    if (originals.length > 1) {
+                        removed.push(...originals.slice(1)); // el resto son duplicados
+                    }
+                }
+
+                // 7) Pintar resultado y alertar si hubo duplicados
+                $('#exampleFormControlTextarea1').val(uniques.join('\n'));
+
+                console.log("Detectados como duplicados:", removed);
+
+                if (removed.length) {
+                    Swal.fire({
+                        title: "Números eliminados",
+                        html: "<pre style='white-space:pre-wrap;margin:0'>" + removed.join('\n') + "</pre>",
+                        icon: "info",
+                        confirmButtonText: "Entendido",
+                        width: 600
+                    });
                 }
             }
 
-            // Inicializar con la primera opción
+
+
+            // Ejecuta al cargar
             updateContactList();
         });
     </script>
@@ -288,49 +313,94 @@
                     if (component.type === 'HEADER') {
                         if (component.format === 'DOCUMENT') {
                             templateType = 'DOCUMENT';
-                            detailsHtml +=
-                                `<div class="my-5"><h5 class="text-h5">Header</h5>
-                                    <div class="form-group">
-                                    <label>Seleccione cómo desea proporcionar el documento:</label>
-                                    <div class="custom-control custom-radio">
-                                        <input type="radio" id="useLink" name="PDFInputType" class="custom-control-input" value="PDFlink" checked>
-                                        <label class="custom-control-label" for="useLink">Usar un link</label>
-                                    </div>
-                                    <div class="custom-control custom-radio">
-                                        <input type="radio" id="useUpload" name="PDFInputType" class="custom-control-input" value="upload">
-                                        <label class="custom-control-label" for="useUpload">Subir un PDF</label>
-                                    </div>
-                                </div>
-                                <div class="form-group linkInput">
-                                    <label for="header">Link del documento en formato (PDF)</label>
-                                    <input type="text" class="form-control" id="header" name="header" required>
-                                </div>
-                                <div class="form-group uploadInput files drag-area" style="display:none;">
-                                    <h2>Arrastre y suelta archivos</h2>
-                                    <span>O</span>
-                                    <button type="button">Seleccione su archivo</button>
-                                    <input type="file" class="form-control-file" id="input-file" name="input-file" hidden accept=".pdf"/>
-                                    <div id="preview"></div>
-                                </div>
-                            </div>`;
+                            detailsHtml += `
+                                            <div class="my-5" data-group="header-document">
+                                                <h5 class="text-h5">Header</h5>
+                                                <div class="form-group">
+                                                    <label>Seleccione cómo desea proporcionar el documento:</label>
+                                                    <div class="custom-control custom-radio">
+                                                        <input type="radio" id="useLink" name="PDFInputType" class="custom-control-input" value="PDFlink" checked>
+                                                        <label class="custom-control-label" for="useLink">Usar un link</label>
+                                                    </div>
+                                                    <div class="custom-control custom-radio">
+                                                        <input type="radio" id="useUpload" name="PDFInputType" class="custom-control-input" value="upload">
+                                                        <label class="custom-control-label" for="useUpload">Subir un PDF</label>
+                                                    </div>
+                                                </div>
+
+                                                <div class="form-group linkInput">
+                                                    <label for="header">Link del documento en formato (PDF)</label>
+                                                    <input type="text" class="form-control" id="header" name="header" required>
+                                                </div>
+
+                                                <div class="form-group uploadInput files drag-area" style="display:none;">
+                                                    <h2>Arrastre y suelta archivos</h2>
+                                                    <span>O</span>
+                                                    <button type="button" class="pick-file">Seleccione su archivo</button>
+                                                    <input type="file" class="form-control-file file-input" id="input-file" name="input-file" hidden accept=".pdf,application/pdf"/>
+                                                    <div class="preview" id="preview"></div>
+                                                </div>
+                                            </div>`;
                         } else if (component.format === 'IMAGE') {
                             templateType = 'IMAGE';
-                            detailsHtml +=
-                                `<div class="my-5"><h5 class="text-h5">Header</h5>
-                                <div class="form-group">
-                                    <label for="header">Link de la imagen en formato (PNG o JPG)</label>
-                                    <input type="text" class="form-control" id="header" name="header" required>
-                                </div>
-                            </div>`;
+                            detailsHtml += `
+                                            <div class="my-5" data-group="header-image">
+                                                <h5 class="text-h5">Header</h5>
+                                                <div class="form-group">
+                                                    <label>Seleccione cómo desea proporcionar la imagen:</label>
+                                                    <div class="custom-control custom-radio">
+                                                        <input type="radio" id="useLinkImage" name="IMAGEInputType" class="custom-control-input" value="link" checked>
+                                                        <label class="custom-control-label" for="useLinkImage">Usar un link</label>
+                                                    </div>
+                                                    <div class="custom-control custom-radio">
+                                                        <input type="radio" id="useUploadImage" name="IMAGEInputType" class="custom-control-input" value="upload">
+                                                        <label class="custom-control-label" for="useUploadImage">Subir una imagen</label>
+                                                    </div>
+                                                </div>
+
+                                                <div class="form-group linkInput">
+                                                    <label for="header-image">Link de la imagen (PNG o JPG)</label>
+                                                    <input type="text" class="form-control" id="header-image" name="header" required>
+                                                </div>
+
+                                                <div class="form-group uploadInput files drag-area" style="display:none;">
+                                                    <h2>Arrastra y suelta la imagen</h2>
+                                                    <span>O</span>
+                                                    <button type="button" class="pick-file">Selecciona tu archivo</button>
+                                                    <input type="file" class="form-control-file file-input" name="input-file" hidden accept=".png,.jpg,.jpeg,image/png,image/jpeg"/>
+                                                    <div class="preview mt-2"></div>
+                                                </div>
+                                            </div>`;
                         } else if (component.format === 'VIDEO') {
                             templateType = 'VIDEO';
-                            detailsHtml +=
-                                `<div class="my-5"><h5 class="text-h5">Header</h5>
-                                <div class="form-group">
-                                    <label for="header">Link del video en formato (MP4)</label>
-                                    <input type="text" class="form-control" id="header" name="header" required>
-                                </div>
-                            </div>`;
+                            detailsHtml += `
+                                            <div class="my-5" data-group="header-video">
+                                                <h5 class="text-h5">Header</h5>
+                                                <div class="form-group">
+                                                    <label>Seleccione cómo desea proporcionar el video:</label>
+                                                    <div class="custom-control custom-radio">
+                                                        <input type="radio" id="useLinkVideo" name="VIDEOInputType" class="custom-control-input" value="link" checked>
+                                                        <label class="custom-control-label" for="useLinkVideo">Usar un link</label>
+                                                    </div>
+                                                    <div class="custom-control custom-radio">
+                                                        <input type="radio" id="useUploadVideo" name="VIDEOInputType" class="custom-control-input" value="upload">
+                                                        <label class="custom-control-label" for="useUploadVideo">Subir un video</label>
+                                                    </div>
+                                                </div>
+
+                                                <div class="form-group linkInput">
+                                                    <label for="header-video">Link del video (MP4)</label>
+                                                    <input type="text" class="form-control" id="header-video" name="header" required>
+                                                </div>
+
+                                                <div class="form-group uploadInput files drag-area" style="display:none;">
+                                                    <h2>Arrastra y suelta el video</h2>
+                                                    <span>O</span>
+                                                    <button type="button" class="pick-file">Selecciona tu archivo</button>
+                                                    <input type="file" class="form-control-file file-input" name="input-file" hidden accept=".mp4,video/mp4"/>
+                                                    <div class="preview mt-2"></div>
+                                                </div>
+                                            </div>`;
                         } else {
                             templateType = 'TEXT';
                             detailsHtml +=
@@ -352,7 +422,7 @@
                                         <label for="${index}">${placeholder.text}</label>
                                         <div class="input-group">
                                             <input type="text" class="form-control format" id="${index}" name="${index}" value="" required/>
-                                            <select class="form-select form-control mb-3" id="select-${index}" onchange="updateInput(${index}, this.value)">
+                                            <select class="form-select mb-3" id="select-${index}" onchange="updateInput(${index}, this.value)">
                                                 <option value="">Selecciona un campo</option>
                                                 ${selectOptions}
                                             </select>
@@ -367,107 +437,58 @@
                             `<div class="my-5"><h5 class="text-h5">Footer</h5><p class="pre-wrap">${component.text}</p></div>`;
                     } else if (component.type === 'BUTTONS') {
                         detailsHtml += '<div class="my-5"><h5 class="text-h5">Buttons</h5>';
-
-                        // Verificar si hay elementos en el array "buttons"
                         if (component.buttons && component.buttons.length > 0) {
-                            detailsHtml +=
-                                '<ul>'; // Puedes usar una lista para mostrar los botones
-                            // Acceder a la URL de cada botón
+                            detailsHtml += '<ul>';
+                            component.buttons.forEach((button, btnIndex) => {
+                                const isUrl = (button.type === 'URL');
+                                const isPhone = (button.type === 'PHONE_NUMBER');
+                                const rawUrl = String(button.url || '');
+                                const hasPlaceholder = /\{\{\s*\d+\s*\}\}/.test(rawUrl) || (
+                                    Array.isArray(button.example) && button.example
+                                    .length > 0);
 
-                            // Iterar sobre cada botón en el array "buttons"
-                            component.buttons.forEach(button => {
-                                if (contienePlantilla(button.url)) {
-                                    if (button.type = 'URL') {
-                                        const buttonUrl = button.url;
-                                        // Acceder a otros detalles del botón si es necesario (text, type, etc.)
-                                        const buttonText = button.text;
-                                        detailsHtml +=
-                                            `<li>
-                                                    <p class="pre-wrap">${buttonText}</p>
-                                                    <p class="pre-wrap">${buttonUrl}</p>
-                                                    <div class="my-5"><h5 class="text-h5">Boton Dinamico</h5>
-                                                    <div class="form-group">
-                                                        <label for="buttons">Completa la url del botton</label>
-                                                        <input type="text" class="form-control" id="buttons" name="buttons" required>
-                                                    </div>
-                                                </li>`;
-                                    } else if (button.type = 'PHONE_NUMBER') {
-                                        const buttonUrl = button.phone_number;
-                                        // Acceder a otros detalles del botón si es necesario (text, type, etc.)
-                                        const buttonText = button.text;
-                                        detailsHtml +=
-                                            `<li>
-                                                    <p class="pre-wrap">${buttonText}</p>
-                                                    <p class="pre-wrap">${buttonUrl}</p>
-                                                    <div class="my-5"><h5 class="text-h5">Boton Dinamico</h5>
-                                                    <div class="form-group">
-                                                        <label for="buttons">Escribe el numero de telefono</label>
-                                                        <input type="text" class="form-control" id="buttons" name="buttons" required>
-                                                    </div>
-                                                </li>`;
-                                    } else {
-                                        detailsHtml +=
-                                            `<li>
-                                                    <p class="pre-wrap">Boton dinamico desconocido</p>
-                                                </li>`;
-                                    }
-                                } else {
-                                    if (button.type = 'URL') {
-                                        const buttonUrl = button.url;
-                                        const buttonPhone = button.phone_number;
-                                        // Acceder a otros detalles del botón si es necesario (text, type, etc.)
-                                        const buttonText = button.text;
-                                        if (buttonUrl) {
-                                            detailsHtml +=
-                                                `<li>
-                                            <p class="pre-wrap">${buttonText}</p>
-                                            <p class="pre-wrap">${buttonUrl}</p>
-                                            <div class="my-5"><h5 class="text-h5">Boton Estatico</h5>
-                                        </li>`;
-                                        } else {
-                                            detailsHtml +=
-                                                `<li>
-                                            <p class="pre-wrap">${buttonText}</p>
-                                            <p class="pre-wrap">${buttonPhone}</p>
-                                            <div class="my-5"><h5 class="text-h5">Boton Estatico</h5>
-                                        </li>`;
-                                        }
-
-                                    } else if (button.type = 'PHONE_NUMBER') {
-                                        const buttonUrl = button.phone_number;
-
-                                        // Acceder a otros detalles del botón si es necesario (text, type, etc.)
-                                        const buttonText = button.text;
-
-                                        detailsHtml +=
-                                            `<li>
-                                        <p class="pre-wrap">${buttonText}</p>
-                                        <p class="pre-wrap">${buttonUrl}</p>
-                                        <div class="my-5"><h5 class="text-h5">Boton Estatico</h5>
-                                    </li>`;
-                                    } else {
-                                        detailsHtml +=
-                                            `<li>
-                                                    <p class="pre-wrap">Boton dinamico desconocido</p>
-                                                </li>`;
-                                    }
+                                if (isUrl && hasPlaceholder) {
+                                    detailsHtml += `
+                                                    <li class="mb-3">
+                                                        <p class="pre-wrap mb-1"><strong>${button.text || ''}</strong></p>
+                                                        <p class="pre-wrap small text-muted">${rawUrl}</p>
+                                                        <div class="form-group mt-2">
+                                                        <label for="button-${btnIndex}">Completa el sufijo</label>
+                                                        <input type="text" class="form-control" id="button-${btnIndex}"
+                                                                name="button_text[]"
+                                                                data-index="${btnIndex}"
+                                                                placeholder="${(Array.isArray(button.example) && button.example[0]) ? button.example[0] : 'ej: pedido-123'}"
+                                                                required>
+                                                        </div>
+                                                    </li>`;
+                                } else if (isUrl) {
+                                    detailsHtml += `
+                                                    <li class="mb-3">
+                                                        <p class="pre-wrap mb-1"><strong>${button.text || ''}</strong></p>
+                                                        <p class="pre-wrap small text-muted">${rawUrl}</p>
+                                                        <div class="my-2"><span class="badge bg-secondary">Botón estático</span></div>
+                                                    </li>`;
+                                } else if (isPhone) {
+                                    detailsHtml += `
+                                                    <li class="mb-3">
+                                                        <p class="pre-wrap mb-1"><strong>${button.text || ''}</strong></p>
+                                                        <p class="pre-wrap small text-muted">${button.phone_number || ''}</p>
+                                                        <div class="my-2"><span class="badge bg-secondary">Botón teléfono</span></div>
+                                                    </li>`;
                                 }
-
                             });
-
                             detailsHtml += '</ul>';
                         } else {
                             detailsHtml += '<p class="pre-wrap">No hay botones disponibles.</p>';
                         }
-
                         detailsHtml += '</div>';
-
                     }
+
                 });
 
                 // Inyecta los detalles construidos en el contenedor
                 $('#templateDetails').html(detailsHtml);
-                inicializarEventListenersDeImagen();
+                initMediaInputs(); // <<< activa radios/drag&drop/preview con scope por grupo
             });
         });
 
@@ -482,53 +503,87 @@
 
         $(document).ready(function() {
             $('#createSend').submit(function(e) {
-                var fileInput = document.getElementById('input-file');
-                e.preventDefault(); // Prevenir la recarga de la página
+                e.preventDefault();
+
+                // Validaciones rápidas
+                if (!$('#selectPlantilla').val()) {
+                    return Swal.fire('Falta seleccionar el número', 'Elige un número disponible.',
+                        'warning');
+                }
+                if (!$('#templatesSelect').val()) {
+                    return Swal.fire('Falta la plantilla', 'Selecciona una plantilla disponible.',
+                        'warning');
+                }
+                const recs = ($('#exampleFormControlTextarea1').val() || '').trim();
+                if (!recs) {
+                    return Swal.fire('Sin contactos', 'Agrega al menos un número de destino.', 'warning');
+                }
+
+
+
                 Swal.fire({
                     title: 'Enviando...',
                     allowOutsideClick: false,
-                    didOpen: () => {
-                        Swal.showLoading();
-                    },
+                    didOpen: () => Swal.showLoading()
                 });
 
-                if ($('#header').val()) {
-                    header_url = $('#header').val();
-                    enviarDatos(header_url); // Envía los datos inmediatamente si solo es un enlace
-                } else if (fileInput !== null) {
-                    var formData = new FormData();
-                    if (fileInput.files[0]) {
-                        formData.append('pdf', fileInput.files[0]);
-                    }
-                    // Ahora, envía formData a Laravel usando AJAX
+                // 1) Detecta el bloque HEADER visible (image/video/document)
+                let $group = $('[data-group^="header-"]:visible').first();
+                if (!$group.length) $group = $('[data-group^="header-"]')
+                    .first(); // fallback si nada visible
+
+                // 2) Lee link o archivo del header actual
+                const linkVal = ($group.find('.linkInput input[type="text"]').val() || '').trim();
+                const fileInput = $group.find('.uploadInput input[type="file"]')[0] || document
+                    .getElementById('input-file');
+
+                // 2.1) Validar link por tipo (solo si hay link)
+                if (linkVal && !validaLinkPorTipo(linkVal, templateType)) {
+                    Swal.close();
+                    return Swal.fire(
+                        'Link inválido',
+                        'El link no coincide con el tipo de header seleccionado (PDF/Imagen/Video).',
+                        'warning'
+                    );
+                }
+
+                // 3) Si hay link, enviar directo
+                if (linkVal) {
+                    enviarDatos(linkVal);
+                    return;
+                }
+
+                // 4) Si hay archivo, súbelo y usa la URL de respuesta
+                if (fileInput && fileInput.files && fileInput.files[0]) {
+                    const formData = new FormData();
+                    formData.append('file', fileInput.files[0]);
+                    formData.append('type', templateType);
+                    // 'DOCUMENT' | 'IMAGE' | 'VIDEO'
+
                     $.ajax({
-                        url: 'upload-pdf',
+                        url: 'upload-pdf', // usa tu ruta existente; en el back acepta image/video/pdf según 'type'
                         type: 'POST',
                         data: formData,
                         headers: {
                             'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                         },
-                        processData: false, // Importante: no procesar los datos
-                        contentType: false, // Importante: no establecer el tipo de contenido
-                        success: function(response) {
-                            // Puedes continuar aquí con el envío de los demás datos de tu formulario
-                            enviarDatos(response.url);
+                        processData: false,
+                        contentType: false,
+                        success: function(res) {
+                            enviarDatos(res.url);
                         },
-                        error: function(err) {
-                            console.log(err);
-                            // Ocultar el mensaje de carga
+                        error: function(xhr) {
+                            console.log(xhr);
                             Swal.close();
-
-                            // Mostrar SweetAlert con el mensaje de error
-                            Swal.fire('Error en el envío',
-                                'No se pudo enviar el mensaje. Inténtalo de nuevo.', 'error'
-                            );
+                            Swal.fire('Archivo no válido', (xhr?.responseJSON?.message ||
+                                'No se pudo subir el archivo.'), 'error');
                         }
                     });
-                } else {
-                    const url = null;
-                    enviarDatos(url);
+                    return;
                 }
+
+                // 5) Sin link ni archivo
+                enviarDatos(null);
             });
         });
     </script>
@@ -562,8 +617,16 @@
             // Luego, asignar valores a las variables
             header_type = templateType; // Ahora asignas el valor deseado
             header_url = url;
-            buttons_url = $('#buttons').val() ? $('#buttons').val() :
-                null; // Ahora asignas el valor deseado
+            // Recoger botones dinámicos como objetos {index, text}
+            // ya no declares de nuevo; solo asigna
+            buttons_url = (function() {
+                const first = $('input[name="button_text[]"]').map(function() {
+                    const t = ($(this).val() || '').trim();
+                    return t || null;
+                }).get().find(Boolean) || null;
+                return first;
+            })();
+
             id_c_business2 = $('#selectPlantilla option:selected').data('id_c_business');
             id_c_business = id_c_business2.toString();
             phone_id2 = $('#selectPlantilla option:selected').data(
@@ -578,7 +641,7 @@
                 null;
             // Obtener los IDs seleccionados en el select con id "etiqueta"
             selectedTags = $('#etiqueta').val();
-            var distintivoSelect = $('#distintivoSelect').val() ? $('#distintivoSelect').val() : null;
+            distintivoSelect = $('#distintivoSelect').val() ? $('#distintivoSelect').val() : null;
 
 
             // Organizar la información en un objeto
@@ -665,140 +728,165 @@
         }
     </script>
     <script>
-        function inicializarEventListenersDeImagen() {
-            document.getElementsByName('PDFInputType').forEach((radio) => {
-                radio.addEventListener('change', function(e) {
-                    toggleImageInput(e.target.value);
+        function initMediaInputs() {
+            document.querySelectorAll('[data-group]').forEach((group) => wireGroup(group));
+        }
+
+        function wireGroup(group) {
+            const radios = group.querySelectorAll('input[type="radio"][name$="InputType"]');
+            const linkWrap = group.querySelector('.linkInput');
+            const uploadWrap = group.querySelector('.uploadInput');
+            const linkField = linkWrap ? linkWrap.querySelector('input[type="text"]') : null;
+            const fileField = uploadWrap ? uploadWrap.querySelector('input[type="file"].file-input') : null;
+
+            if (radios.length) {
+                const selected = Array.from(radios).find(r => r.checked) || radios[0];
+                toggleMode(group, selected?.value === 'upload', {
+                    linkWrap,
+                    uploadWrap,
+                    linkField,
+                    fileField
+                });
+            }
+
+            radios.forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    toggleMode(group, e.target.value === 'upload', {
+                        linkWrap,
+                        uploadWrap,
+                        linkField,
+                        fileField
+                    });
                 });
             });
 
-            inicializarEventosDeSubida();
-        }
-
-        function toggleImageInput(value) {
-            if (value === 'PDFlink') {
-                document.querySelector('.linkInput').style.display = '';
-                document.querySelector('.uploadInput').style.display = 'none';
-                document.querySelector('.linkInput input[type="text"]').required = true;
-                document.querySelector('.uploadInput input[type="file"]').required = false;
-                limpiarFormularioDeSubida();
-            } else {
-                document.querySelector('.linkInput').style.display = 'none';
-                document.querySelector('.uploadInput').style.display = '';
-                document.querySelector('.uploadInput input[type="file"]').required = true;
-                document.querySelector('.linkInput input[type="text"]').required = false;
-                document.querySelector('.linkInput input[type="text"]').value = '';
+            const pickBtn = group.querySelector('.pick-file');
+            if (pickBtn && fileField) {
+                pickBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    fileField.click();
+                });
             }
 
-            inicializarEventosDeSubida();
+            if (fileField) {
+                fileField.addEventListener('change', (e) => {
+                    e.preventDefault();
+                    const f = e.target.files?.[0];
+                    if (f) renderPreview(group, f, fileField);
+                });
+            }
+
+            const dropArea = group.querySelector('.drag-area');
+            if (dropArea && fileField) {
+                dropArea.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    dropArea.classList.add('active');
+                });
+                dropArea.addEventListener('dragleave', (e) => {
+                    e.preventDefault();
+                    dropArea.classList.remove('active');
+                });
+                dropArea.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    dropArea.classList.remove('active');
+                    const file = e.dataTransfer.files?.[0];
+                    if (!file) return;
+                    if (!isAccepted(file, fileField)) {
+                        alert('El tipo de archivo no es válido para este campo.');
+                        return;
+                    }
+                    const dt = new DataTransfer();
+                    dt.items.add(file);
+                    fileField.files = dt.files;
+                    renderPreview(group, file, fileField);
+                });
+            }
         }
 
-        function inicializarEventosDeSubida() {
-            const dropArea = document.querySelector(".drag-area");
-
-            if (!dropArea) return;
-
-            const input = dropArea.querySelector("#input-file");
-            const button = dropArea.querySelector("button");
-
-            // Remover event listeners previos
-            button.removeEventListener("click", handleButtonClick);
-            input.removeEventListener("change", handleFileInputChange);
-            dropArea.removeEventListener("dragover", handleDragOver);
-            dropArea.removeEventListener("dragleave", handleDragLeave);
-            dropArea.removeEventListener("drop", handleDrop);
-
-            // Añadir event listeners
-            button.addEventListener("click", handleButtonClick);
-            input.addEventListener("change", handleFileInputChange);
-            dropArea.addEventListener("dragover", handleDragOver);
-            dropArea.addEventListener("dragleave", handleDragLeave);
-            dropArea.addEventListener("drop", handleDrop);
+        function toggleMode(group, isUpload, refs) {
+            const {
+                linkWrap,
+                uploadWrap,
+                linkField,
+                fileField
+            } = refs;
+            if (linkWrap) linkWrap.style.display = isUpload ? 'none' : '';
+            if (uploadWrap) uploadWrap.style.display = isUpload ? '' : 'none';
+            if (linkField) linkField.required = !isUpload;
+            if (fileField) fileField.required = isUpload;
+            if (isUpload && linkField) linkField.value = '';
+            if (!isUpload && fileField) {
+                fileField.value = '';
+                clearPreview(group);
+            }
         }
 
-        function handleButtonClick(e) {
-            e.preventDefault();
-            const input = document.querySelector(".drag-area #input-file");
-            input.click();
+        function clearPreview(group) {
+            const preview = group.querySelector('.preview');
+            if (preview) preview.innerHTML = '';
         }
 
-        function handleFileInputChange(e) {
-            e.preventDefault();
-            const files = e.target.files;
-            mostrarArchivos(files);
+        function renderPreview(group, file, fileInput) {
+            const preview = group.querySelector('.preview');
+            if (!preview) return;
+            preview.innerHTML = '';
+
+            if (!isAccepted(file, fileInput)) {
+                alert('El tipo de archivo no es válido para este campo.');
+                return;
+            }
+
+            const type = file.type || '';
+            if (type.startsWith('image/')) {
+                const img = document.createElement('img');
+                img.alt = 'Vista previa';
+                img.style.maxWidth = '260px';
+                img.style.maxHeight = '180px';
+                img.src = URL.createObjectURL(file);
+                preview.appendChild(img);
+                return;
+            }
+            if (type.startsWith('video/')) {
+                const video = document.createElement('video');
+                video.controls = true;
+                video.width = 320;
+                video.src = URL.createObjectURL(file);
+                preview.appendChild(video);
+                return;
+            }
+            const p = document.createElement('p');
+            p.textContent = `Archivo seleccionado: ${file.name}`;
+            preview.appendChild(p);
         }
 
-        function handleDragOver(e) {
-            e.preventDefault();
-            const dropArea = document.querySelector(".drag-area");
-            dropArea.classList.add("active");
-        }
+        function isAccepted(file, input) {
+            const acceptAttr = (input.getAttribute('accept') || '').split(',').map(s => s.trim()).filter(Boolean);
+            if (acceptAttr.length === 0) return true;
+            const fileType = (file.type || '').toLowerCase();
+            const fileName = (file.name || '').toLowerCase();
 
-        function handleDragLeave(e) {
-            e.preventDefault();
-            const dropArea = document.querySelector(".drag-area");
-            dropArea.classList.remove("active");
-        }
-
-        function handleDrop(e) {
-            e.preventDefault();
-            const files = e.dataTransfer.files;
-            mostrarArchivos(files);
-            const dropArea = document.querySelector(".drag-area");
-            dropArea.classList.remove("active");
-        }
-
-        function mostrarArchivos(files) {
-            if (files.length === undefined) {
-                procesarArchivo(files);
-            } else {
-                for (const file of files) {
-                    procesarArchivo(file);
+            return acceptAttr.some(a => {
+                a = a.toLowerCase();
+                if (a.includes('/')) {
+                    if (a.endsWith('/*')) {
+                        const base = a.split('/')[0];
+                        return fileType.startsWith(base + '/');
+                    }
+                    return fileType === a;
                 }
-            }
+                return fileName.endsWith(a); // .pdf .png .mp4 ...
+            });
         }
 
-        function procesarArchivo(file) {
-            const docType = file.type;
-            const validExtensions = ["application/pdf"];
-
-            if (validExtensions.includes(docType)) {
-                const fileReader = new FileReader();
-                const id = `file-${Math.random().toString(32).substring(7)}`;
-
-                fileReader.addEventListener("load", (e) => {
-                    const pdfPreview = `
-                        <div id="${id}" class="file-container">
-                            <div class="status">
-                                <span><i class="fa fa-file-pdf"></i></span>
-                                <span>${file.name}</span>
-                            </div>
-                        </div>
-                    `;
-                    document.querySelector("#preview").innerHTML = pdfPreview;
-                });
-
-                fileReader.readAsDataURL(file);
-            } else {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Archivo no válido',
-                    text: 'Por favor, selecciona un archivo PDF.',
-                });
-            }
+        function validaLinkPorTipo(url, type) {
+            const u = String(url || '');
+            if (type === 'DOCUMENT') return /\.(pdf)(\?|#|$)/i.test(u);
+            if (type === 'IMAGE') return /\.(png|jpe?g)(\?|#|$)/i.test(u);
+            if (type === 'VIDEO') return /\.(mp4)(\?|#|$)/i.test(u);
+            return true;
         }
 
-        function limpiarFormularioDeSubida() {
-            const inputArchivo = document.getElementById('input-file');
-            if (inputArchivo) {
-                const nuevoInputArchivo = inputArchivo.cloneNode(true);
-                inputArchivo.parentNode.replaceChild(nuevoInputArchivo, inputArchivo);
-            }
-            document.getElementById('preview').innerHTML = '';
-        }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            inicializarEventListenersDeImagen();
-        });
+        // Inicializa si la vista viene ya con un header inyectado
+        document.addEventListener('DOMContentLoaded', initMediaInputs);
     </script>
 @stop

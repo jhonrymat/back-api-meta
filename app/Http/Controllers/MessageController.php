@@ -24,16 +24,18 @@ use Illuminate\Support\Str;
 use App\Models\Aplicaciones;
 use Illuminate\Http\Request;
 use App\Models\TareaProgramada;
+use Illuminate\Validation\Rule;
 use App\Jobs\SendNotificationJob;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Bus;
-use Illuminate\Support\Facades\Log;
 
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Storage;
 use App\Http\Controllers\ClocalController;
+use Illuminate\Support\Facades\Validator;
 
 
 class MessageController extends Controller
@@ -94,7 +96,7 @@ class MessageController extends Controller
         }
 
         // Paginación
-        $paginator = $query->paginate($perPage);
+        $paginator = $query->simplePaginate($perPage);
 
         $contactos = $paginator->getCollection()->map(function ($contacto) {
             $data = $contacto->toArray();
@@ -188,7 +190,7 @@ class MessageController extends Controller
                 ->where('wa_id', $waId)
                 ->where('m.phone_id', $phone_id)
                 ->orderByDesc('created_at') // Ordena por created_at descendente para obtener los más recientes primero
-                ->paginate($perPage);
+                ->simplePaginate($perPage);
 
             $messages = $messagesQuery->getCollection();
 
@@ -430,17 +432,20 @@ class MessageController extends Controller
                 if (empty($exists->id)) {
 
                     // Verificar si el contacto existe
-                    $contacto = Contacto::where('telefono', $value['contacts'][0]['profile']['wa_id'])->first();
+                    $contacto = Contacto::where('telefono', $value['contacts'][0]['wa_id'])->first();
                     // Si no existe, crearlo
                     if (!$contacto) {
                         $contacto = new Contacto();
-                        $contacto->telefono = $value['contacts'][0]['profile']['wa_id'];
+                        $contacto->telefono = $value['contacts'][0]['wa_id'];
                         $contacto->nombre = $value['contacts'][0]['profile']['name'];
                         $contacto->notas = "Contacto creado automáticamente por webhook";
                         $contacto->save();
 
                         // Asociar los tags seleccionados al nuevo contacto
-                        $contacto->tags()->attach(22, ['user_id' => auth()->id()]);
+                        // Versión segura (no duplica) con pivot:
+                        $contacto->tags()->syncWithoutDetaching([
+                            22 => ['user_id' => auth()->id()],
+                        ]);
                     } else if ($contacto->nombre == $contacto->telefono) {
                         $contacto->nombre = $value['contacts'][0]['profile']['name'];
                         $contacto->save();
@@ -543,30 +548,77 @@ class MessageController extends Controller
 
     public function upload(Request $request)
     {
-        $request->validate([
-            'pdf' => 'required|file|mimes:pdf|max:10240', // 10MB
-        ]);
+        // Límites en KB (puedes moverlos a config/whatsapp.php)
+        $maxImageKB = config('whatsapp.max_image_kb', 5120);    // 5 MB
+        $maxVideoKB = config('whatsapp.max_video_kb', 16384);   // 16 MB
+        $maxDocKB = config('whatsapp.max_document_kb', 10240); // 10 MB
+
+        $type = strtoupper($request->input('type', 'DOCUMENT'));
+        $file = $request->file('file') ?? $request->file('pdf'); // compatibilidad
+
+        // Arma reglas por tipo
+        $rulesByType = [
+            'DOCUMENT' => ['required', 'file', 'mimetypes:application/pdf', "max:$maxDocKB"],
+            'IMAGE' => ['required', 'file', 'mimetypes:image/jpeg,image/png', "max:$maxImageKB"],
+            // WhatsApp Cloud acepta mp4 y 3gpp; deja solo mp4 si prefieres
+            'VIDEO' => ['required', 'file', 'mimetypes:video/mp4,video/3gpp,application/mp4', "max:$maxVideoKB"],
+        ];
+        $labels = [
+            'DOCUMENT' => 'documento (PDF)',
+            'IMAGE' => 'imagen (JPG o PNG)',
+            'VIDEO' => 'video (MP4 o 3GP)',
+        ];
+        $human = fn(int $kb) => rtrim(rtrim(number_format($kb / 1024, 2), '0'), '.') . ' MB';
+
+        // Validador con mensajes personalizados
+        $validator = Validator::make(
+            ['type' => $type, 'file' => $file],
+            [
+                'type' => ['required', Rule::in(['DOCUMENT', 'IMAGE', 'VIDEO'])],
+                'file' => $rulesByType[$type] ?? $rulesByType['DOCUMENT'],
+            ],
+            [
+                'type.in' => 'Tipo no válido. Usa DOCUMENT, IMAGE o VIDEO.',
+                'file.required' => 'Debes seleccionar un archivo.',
+                'file.file' => 'El archivo es inválido o está corrupto.',
+                'file.mimetypes' => "Formato no permitido. Para {$labels[$type]} solo se acepta ese formato.",
+                'file.max' => "El {$labels[$type]} supera el tamaño máximo de " .
+                    ($type === 'DOCUMENT' ? $human($maxDocKB) :
+                        ($type === 'IMAGE' ? $human($maxImageKB) : $human($maxVideoKB))) . '.',
+            ]
+        );
+
+        if ($validator->fails()) {
+            // Devuelve 422 con el primer mensaje claro para el frontend
+            return response()->json([
+                'ok' => false,
+                'errors' => $validator->errors(),
+                'message' => $validator->errors()->first('file') ?? $validator->errors()->first(),
+            ], 422);
+        }
 
         try {
-            if ($request->hasFile('pdf')) {
-                $pdf = $request->file('pdf');
-                $filename = 'pdfs/' . uniqid() . '.' . $pdf->getClientOriginalExtension();
+            $folder = match ($type) {
+                'IMAGE' => 'headers/image',
+                'VIDEO' => 'headers/video',
+                default => 'headers/document',
+            };
 
-                // Guardar en el disco público
-                $path = $pdf->storeAs('', $filename, 'public');
+            $ext = $file->getClientOriginalExtension();
+            $filename = $folder . '/' . uniqid() . '.' . $ext;
+            $file->storeAs('', $filename, 'public');
 
-                // Retorna URL del archivo
-                return response()->json(['url' => Storage::disk('public')->url($filename)], 200);
-            } else {
-                return response()->json(['error' => 'No se encontró el archivo PDF en la solicitud.'], 400);
-            }
-        } catch (Exception $e) {
-            // Log the exception for debugging purposes
-            Log::error('Error uploading file: ' . $e->getMessage());
+            return response()->json([
+                'ok' => true,
+                'url' => Storage::disk('public')->url($filename),
+            ], 200);
 
-            return response()->json(['error' => 'Ocurrió un error al subir el archivo. Por favor, inténtelo de nuevo.'], 500);
+        } catch (Throwable $e) {
+            Log::error('Error uploading header: ' . $e->getMessage());
+            return response()->json(['ok' => false, 'message' => 'Error al subir el archivo.'], 500);
         }
     }
+
 
     public function sendMessageTemplate(Request $request)
     {
@@ -752,8 +804,16 @@ class MessageController extends Controller
                         }
 
                         // Asociar tags si existen
-                        if ($tags) {
-                            $contacto->tags()->syncWithoutDetaching($tags);
+                        // $tags puede venir vacío o con IDs (strings o ints)
+                        if (!empty($tags)) {
+                            $tagIds = collect((array) $tags)
+                                ->filter(fn($v) => $v !== null && $v !== '')
+                                ->map(fn($id) => (int) $id)
+                                ->unique();
+
+                            $contacto->tags()->syncWithoutDetaching(
+                                $tagIds->mapWithKeys(fn($id) => [$id => ['user_id' => $user->id]])->toArray()
+                            );
                         }
                     }
 
@@ -839,17 +899,29 @@ class MessageController extends Controller
                 $envio->save();
 
                 Log::info('envio encolado ' . count($recipients));
+
+                // Actualiza status_send aquí si aplica
+                try {
+                    if (!empty($input['status_send'])) {
+                        app(ClocalController::class)->update($input['solicitudId'], $input['status_send']);
+                    }
+                } catch (Throwable $e) {
+                    Log::warning('No se pudo actualizar status_send', ['e' => $e->getMessage()]);
+                }
+
+                if (!empty($input['status_send'])) {
+                    $clocalController = new ClocalController();
+                    $clocalController->update($input['solicitudId'], $input['status_send']);
+                }
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Envío encolado correctamente.',
+                    'batch_id' => $batch->id,
+                    'queued' => $jobs->count(),
+                ], 202); // <- una sola respuesta y listo
             }
 
-            if (!empty($input['status_send'])) {
-                $clocalController = new ClocalController();
-                $clocalController->update($input['solicitudId'], $input['status_send']);
-            }
 
-            return response()->json([
-                'success' => true,
-                'data' => ' Mensajes encolado correctamente.',
-            ], 200);
         } catch (Exception $e) {
             Log::error('Error en sendMessageTemplate: ' . $e->getMessage(), [
                 'input' => $input,
@@ -880,6 +952,14 @@ class MessageController extends Controller
             $wam->updated_at = Carbon::createFromTimestamp($timestamp)->toDateTimeString();
         }
         $wam->save();
+
+        Webhook::dispatch($wam, false);
+        Log::info('mensaje enviado por el usuario: ' . $wam->body);
+        // encontrar el contacto relacionado
+        $contacto = Contacto::where('telefono', $waId)->first();
+        // 🔥 Marcar contacto con mensaje nuevo
+        $contacto->tiene_mensajes_nuevos = true;
+        $contacto->save();
 
         return $wam;
     }

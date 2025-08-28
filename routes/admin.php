@@ -210,6 +210,7 @@ Route::post('newsletters/{newsletter}/send', [NewsletterController::class, 'send
 Route::resource('newsletters', NewsletterController::class);
 Route::get('newsletters/{newsletter}/recipients/count', [NewsletterController::class, 'countRecipients']);
 Route::patch('newsletters/{newsletter}/cancel', [NewsletterController::class, 'cancel'])->name('newsletters.cancel');
+Route::get('newsletters/{newsletter}/recipients/count', [NewsletterController::class, 'count'])->name('newsletters.recipients.count');
 
 //conteo de menajes diarios:
 Route::get('/conteo/por-dia', [ConteoController::class, 'verPorDia'])->middleware('can:plantillas')->name('conteo.por-dia');

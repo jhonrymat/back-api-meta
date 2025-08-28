@@ -1,6 +1,10 @@
 .drag-area {
     border: 2px dashed #ddd;
-    height: 236px;
+    height: auto;
+    /* permite crecer */
+    overflow: visible;
+    /* nada se corta */
+    min-height: 220px;
     border-radius: 5px;
     display: flex;
     align-items: center;
@@ -49,4 +53,13 @@
     width: 100%;
     object-fit: cover;
     border-radius: 5px;
+}
+
+.drag-area .preview video {
+    width: 150px !important;
+    max-width: 100%;
+    height: auto;
+    display: block;
+    object-fit: contain;
+    /* o 'cover' si quieres recorte */
 }
