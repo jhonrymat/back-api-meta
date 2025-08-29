@@ -8,10 +8,12 @@ use Illuminate\Http\Request;
 use App\Models\EmailTemplate;
 use App\Jobs\SendNewsletterJob;
 use App\Mail\NewsletterTestMail;
+use Illuminate\Support\Facades\DB;
 use App\Jobs\SendBulkNewsletterJob;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Cache;
 
 class NewsletterController extends Controller
 {
@@ -257,6 +259,48 @@ class NewsletterController extends Controller
         }
 
         return [$emailTemplate, $recipients];
+    }
+
+    public function count(Newsletter $newsletter, Request $request)
+    {
+        // Cachea 10 min para no recalcular en cada clic
+        $count = Cache::remember("newsletter:{$newsletter->id}:recipients_count", 600, function() use ($newsletter) {
+            $newsletterId = $newsletter->id;
+
+            // --- Emails por TAGS ---
+            // pivot newsletter<->tag: tag_newsletter (newsletter_id, tag_id)
+            // pivot contacto<->tag:  contacto_tag (contacto_id, tag_id)
+            // tabla contactos:       contactos (id, correo)
+            $tagEmails = DB::table('tag_newsletter as tn')
+                ->join('contacto_tag as ct', 'ct.tag_id', '=', 'tn.tag_id')
+                ->join('contactos as c', 'c.id', '=', 'ct.contacto_id')
+                ->where('tn.newsletter_id', $newsletterId)
+                ->whereNotNull('c.correo')
+                ->selectRaw('LOWER(c.correo) as email');
+
+            // --- Emails por GRUPOS ---
+            // Ajusta a tu modelo real:
+            // Supuesto común:
+            //   group_newsletter (newsletter_id, group_id)
+            //   group_user_emails (group_id, user_email_id)
+            //   user_emails (id, email)
+            $groupEmails = DB::table('group_newsletter as gn')
+                ->join('group_user_emails as gue', 'gue.group_id', '=', 'gn.group_id')   // <-- ajusta si tu pivot se llama distinto
+                ->join('user_emails as ue', 'ue.id', '=', 'gue.user_email_id')          // <-- o si guardas el email directo en la pivot, usa ese campo
+                ->where('gn.newsletter_id', $newsletterId)
+                ->whereNotNull('ue.email')
+                ->selectRaw('LOWER(ue.email) as email');
+
+            // UNION y conteo de distintos
+            $union = $tagEmails->union($groupEmails);
+
+            return DB::query()
+                ->fromSub($union, 'u')
+                ->distinct('u.email')
+                ->count('u.email');
+        });
+
+        return response()->json(['count' => $count]);
     }
 
 }
