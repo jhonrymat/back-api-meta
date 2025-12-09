@@ -2,8 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Envio extends Model
 {
@@ -24,5 +25,20 @@ class Envio extends Model
     public function users()
     {
         return $this->belongsToMany(User::class, 'user_envios');
+    }
+
+    public function batch()
+    {
+        return $this->belongsTo(\Illuminate\Bus\Batch::class, 'batch_id');
+    }
+
+    // O mejor aún, usar el repositorio de batches
+    public function getBatchStats()
+    {
+        if (!$this->batch_id) {
+            return null;
+        }
+
+        return Bus::findBatch($this->batch_id);
     }
 }

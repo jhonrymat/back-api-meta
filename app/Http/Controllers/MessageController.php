@@ -920,7 +920,7 @@ class MessageController extends Controller
                             DB::table('envios')
                                 ->where('id', $envio->id)
                                 ->update([
-                                    'status' => 'Fallido',
+                                    'status' => 'Completado con errores',
                                     'updated_at' => now()
                                 ]);
 
@@ -951,7 +951,7 @@ class MessageController extends Controller
                                 'progress' => $batch->progress(),
                                 'cancelled' => $batch->cancelled()
                             ]);
-                        } catch (\Exception $e) {
+                        } catch (Exception $e) {
                             // Si falla el logging, no importa mucho
                             Log::error("Error en callback finally()", ['error' => $e->getMessage()]);
                         }

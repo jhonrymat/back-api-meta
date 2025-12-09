@@ -39,7 +39,7 @@
                     </div>
                     <div class="col-md-3">
                         <div class="text-center">
-                            <h5>Fallidos</h5>
+                            <h5>Completado con errores</h5>
                             <p class="h4 text-danger" id="failed">-</p>
                         </div>
                     </div>

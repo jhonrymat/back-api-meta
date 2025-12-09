@@ -55,7 +55,7 @@
                             <span class="badge badge-warning">{{ $app->status }}</span>
                         @elseif($app->status == 'Completado')
                             <span class="badge badge-success">{{ $app->status }}</span>
-                        @elseif($app->status == 'Fallido')
+                        @elseif($app->status == 'Completado con errores')
                             <span class="badge badge-danger">{{ $app->status }}</span>
                         @else
                             <span class="badge badge-secondary">Sin estado</span>
@@ -212,9 +212,9 @@
                         if (response.envio.status === 'Completado') {
                             badge.removeClass('badge-warning').addClass('badge-success');
                             badge.text('Completado');
-                        } else if (response.envio.status === 'Fallido') {
+                        } else if (response.envio.status === 'Completado con errores') {
                             badge.removeClass('badge-warning').addClass('badge-danger');
-                            badge.text('Fallido');
+                            badge.text('Completado con errores');
                         }
 
                         // Notificación opcional
