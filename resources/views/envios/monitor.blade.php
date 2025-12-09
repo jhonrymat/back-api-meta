@@ -74,7 +74,7 @@
 
         function actualizarEstado() {
             $.ajax({
-                url: `/envios/${envioId}/status`,
+                url: `/admin/envios/${envioId}/status`,
                 method: 'GET',
                 success: function(response) {
                     if (response.batch) {
