@@ -152,7 +152,7 @@
                 </section>
 
             </div>
-            <div class="row">
+            {{-- <div class="row">
 
                 <section class="col-lg-12 connectedSortable ui-sortable">
                     <div class="card card-primary">
@@ -223,7 +223,7 @@
 
 
 
-            </div>
+            </div> --}}
         </div>
     </section>
 @stop
@@ -375,7 +375,7 @@
             responsive: true,
         });
     </script>
-    <script>
+    {{-- <script>
         function exportarMensaje(reporteId) {
             Swal.fire({
                 title: '¿Estás seguro?',
@@ -419,5 +419,5 @@
                 }
             });
         }
-    </script>
+    </script> --}}
 @stop
