@@ -100,10 +100,10 @@ class SendMessage implements ShouldQueue
             );
         });
 
-        Log::info("✅ Mensaje enviado exitosamente", [
-            'wam_id' => $wamId,
-            'wa_id' => $request["contacts"][0]["wa_id"]
-        ]);
+        // Log::info("✅ Mensaje enviado exitosamente", [
+        //     'wam_id' => $wamId,
+        //     'wa_id' => $request["contacts"][0]["wa_id"]
+        // ]);
     }
 
     /**
