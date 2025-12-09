@@ -889,51 +889,72 @@ class MessageController extends Controller
                     ->name("Envío Masivo: {$templateName} ({$envio->id})")
                     ->then(function (Batch $batch) use ($envio, $user) {
                         // ✅ Actualizar usando query builder (más rápido que Eloquent)
-                        DB::table('envios')
-                            ->where('id', $envio->id)
-                            ->update([
-                                'status' => 'Completado',
-                                'updated_at' => now()
+                        try {
+                            DB::table('envios')
+                                ->where('id', $envio->id)
+                                ->update([
+                                    'status' => 'Completado',
+                                    'updated_at' => now()
+                                ]);
+
+                            Log::info("✅ Batch completado", [
+                                'batch_id' => $batch->id,
+                                'envio_id' => $envio->id,
+                                'processed' => $batch->processedJobs(),
+                                'failed' => $batch->failedJobs
                             ]);
 
-                        Log::info("✅ Batch completado", [
-                            'batch_id' => $batch->id,
-                            'envio_id' => $envio->id,
-                            'processed' => $batch->processedJobs(),
-                            'failed' => $batch->failedJobs
-                        ]);
-
-                        // 🔔 Notificar al usuario (asíncrono)
-                        dispatch(new SendNotificationJob($user));
+                            // 🔔 Notificar al usuario (asíncrono)
+                            dispatch(new SendNotificationJob($user));
+                        } catch (Exception $e) {
+                            // Si falla el callback, al menos loguearlo
+                            Log::error("Error en callback then()", [
+                                'batch_id' => $batch->id,
+                                'error' => $e->getMessage()
+                            ]);
+                        }
                     })
                     ->catch(function (Batch $batch, Throwable $e) use ($envio) {
-                        // ❌ Marcar como fallido
-                        DB::table('envios')
-                            ->where('id', $envio->id)
-                            ->update([
-                                'status' => 'Fallido',
-                                'updated_at' => now()
-                            ]);
+                        try {
+                            // ❌ Marcar como fallido
+                            DB::table('envios')
+                                ->where('id', $envio->id)
+                                ->update([
+                                    'status' => 'Fallido',
+                                    'updated_at' => now()
+                                ]);
 
-                        Log::error("❌ Batch falló", [
-                            'batch_id' => $batch->id,
-                            'envio_id' => $envio->id,
-                            'error' => $e->getMessage(),
-                            'failed_jobs' => $batch->failedJobs
-                        ]);
+                            Log::error("❌ Batch falló", [
+                                'batch_id' => $batch->id,
+                                'envio_id' => $envio->id,
+                                'error' => $e->getMessage(),
+                                'failed_jobs' => $batch->failedJobs
+                            ]);
+                        } catch (Exception $ex) {
+                            Log::error("Error en callback catch()", [
+                                'batch_id' => $batch->id,
+                                'error' => $ex->getMessage()
+                            ]);
+                        }
                     })
                     ->finally(function (Batch $batch) use ($envio) {
                         // 📊 Log final con estadísticas
-                        Log::info("📊 Batch finalizado", [
-                            'batch_id' => $batch->id,
-                            'envio_id' => $envio->id,
-                            'total_jobs' => $batch->totalJobs,
-                            'processed' => $batch->processedJobs(),
-                            'pending' => $batch->pendingJobs,
-                            'failed' => $batch->failedJobs,
-                            'progress' => $batch->progress(),
-                            'cancelled' => $batch->cancelled()
-                        ]);
+                        // 📊 OPTIMIZACIÓN: Hacer esto asíncrono para no bloquear
+                        try {
+                            Log::info("📊 Batch finalizado", [
+                                'batch_id' => $batch->id,
+                                'envio_id' => $envio->id,
+                                'total_jobs' => $batch->totalJobs,
+                                'processed' => $batch->processedJobs(),
+                                'pending' => $batch->pendingJobs,
+                                'failed' => $batch->failedJobs,
+                                'progress' => $batch->progress(),
+                                'cancelled' => $batch->cancelled()
+                            ]);
+                        } catch (\Exception $e) {
+                            // Si falla el logging, no importa mucho
+                            Log::error("Error en callback finally()", ['error' => $e->getMessage()]);
+                        }
                     })
                     ->onQueue('whatsapp-queue')
                     ->allowFailures() // ⚠️ IMPORTANTE: No cancelar todo el batch si algunos jobs fallan

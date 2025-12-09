@@ -70,6 +70,7 @@ return [
                     "innodb_lock_wait_timeout=10," . // Timeout de lock reducido
                     "transaction_isolation='READ-COMMITTED'", // Menos bloqueos
             ]) : [],
+            'sticky' => true,
         ],
 
         'pgsql' => [

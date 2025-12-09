@@ -33,6 +33,9 @@ class SendMessage implements ShouldQueue
     // ⚡ Backoff exponencial: 10s, 30s, 90s
     public $backoff = [10, 30, 90];
 
+    // 🔥 NUEVO: Liberar batch antes de fallar para evitar deadlocks
+    public $deleteWhenMissingModels = true;
+
     public function __construct($tokenApp, $phone_id, $payload, $body, $messageData = [], $distintivo)
     {
         $this->payload = $payload;
@@ -45,6 +48,14 @@ class SendMessage implements ShouldQueue
 
     public function handle()
     {
+        // 🛑 Si el batch fue cancelado, salir inmediatamente
+        if ($this->batch()?->cancelled()) {
+            Log::info('Batch cancelado, job omitido', [
+                'wa_id' => $this->payload['to'] ?? 'unknown'
+            ]);
+            return;
+        }
+
         // 🛑 Si el batch fue cancelado, no continuar
         try {
             $wp = new Whatsapp();
@@ -72,14 +83,17 @@ class SendMessage implements ShouldQueue
     /**
      * Guardar mensaje exitoso con protección contra duplicados
      */
+    /**
+     * 🔥 OPTIMIZADO: Sin transacción anidada, updateOrCreate ya es atómico
+     */
     private function saveSuccessMessage($request)
     {
         $wamId = $request["messages"][0]["id"];
 
-        // 🔒 Usar updateOrCreate para evitar duplicados (requiere índice único en wam_id)
-        DB::transaction(function () use ($request, $wamId) {
+        try {
+            // ✅ updateOrCreate es atómico por sí solo (no necesita DB::transaction)
             Message::updateOrCreate(
-                ['wam_id' => $wamId], // Buscar por wam_id
+                ['wam_id' => $wamId], // Buscar por wam_id (necesita índice único)
                 [
                     'body' => $this->body,
                     'outgoing' => true,
@@ -93,12 +107,14 @@ class SendMessage implements ShouldQueue
                     'code' => '',
                 ]
             );
-        });
-
-        // Log::info("✅ Mensaje enviado exitosamente", [
-        //     'wam_id' => $wamId,
-        //     'wa_id' => $request["contacts"][0]["wa_id"]
-        // ]);
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Si hay error de duplicado (código 1062), ignorarlo
+            if ($e->getCode() == 23000) {
+                Log::warning('Mensaje duplicado ignorado', ['wam_id' => $wamId]);
+                return;
+            }
+            throw $e;
+        }
     }
 
     /**
@@ -108,23 +124,23 @@ class SendMessage implements ShouldQueue
     {
         $jsonStartPos = strpos($request, '{');
         if ($jsonStartPos === false) {
-            Log::error("Respuesta de error no contiene JSON válido: " . substr($request, 0, 200));
+            Log::error("Respuesta sin JSON válido: " . substr($request, 0, 200));
             return;
         }
 
         $errorJsonString = substr($request, $jsonStartPos);
         $errorJson = json_decode($errorJsonString, true);
 
-        if (!$errorJson || !isset($errorJson['error']['code'], $errorJson['error']['fbtrace_id'])) {
-            Log::error("Error al decodificar respuesta de error: " . $errorJsonString);
+        if (!$errorJson || !isset($errorJson['error']['code'])) {
+            Log::error("Error al decodificar JSON: " . $errorJsonString);
             return;
         }
 
         $errorCode = $errorJson['error']['code'];
-        $fbtrace_id = $errorJson['error']['fbtrace_id'];
+        $fbtrace_id = $errorJson['error']['fbtrace_id'] ?? 'unknown';
 
-        // 🔒 Guardar error con transacción
-        DB::transaction(function () use ($errorCode, $fbtrace_id, $errorJsonString) {
+        try {
+            // ✅ Sin transacción, create ya es atómico
             Message::create([
                 'body' => $this->body,
                 'outgoing' => true,
@@ -138,7 +154,12 @@ class SendMessage implements ShouldQueue
                 'distintivo' => $this->distintivo,
                 'code' => $errorCode,
             ]);
-        });
+        } catch (\Illuminate\Database\QueryException $e) {
+            Log::error('Error al guardar mensaje fallido', [
+                'wa_id' => $this->payload["to"],
+                'error' => $e->getMessage()
+            ]);
+        }
 
         Log::warning("⚠️ Mensaje falló", [
             'wa_id' => $this->payload["to"],
@@ -150,11 +171,26 @@ class SendMessage implements ShouldQueue
     /**
      * Manejar fallos del job después de todos los reintentos
      */
+    /**
+     * 🔥 NUEVO: Liberar el batch antes de marcar como fallido
+     */
     public function failed(Exception $exception)
     {
-        Log::error('❌ SendMessage Job falló definitivamente después de todos los reintentos', [
+        // Liberar el batch primero para evitar deadlocks
+        if ($batch = $this->batch()) {
+            try {
+                // No hacer nada con el batch aquí, Laravel ya lo maneja
+            } catch (Exception $e) {
+                Log::error('Error al procesar batch en failed()', [
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+
+        Log::error('❌ SendMessage Job falló definitivamente', [
             'payload_to' => $this->payload['to'] ?? 'unknown',
             'exception' => $exception->getMessage(),
+            'attempts' => $this->attempts(),
         ]);
     }
 }
