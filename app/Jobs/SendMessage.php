@@ -46,11 +46,6 @@ class SendMessage implements ShouldQueue
     public function handle()
     {
         // 🛑 Si el batch fue cancelado, no continuar
-        if ($this->batch() && $this->batch()->cancelled()) {
-            Log::info("Job cancelado porque el batch fue cancelado");
-            return;
-        }
-
         try {
             $wp = new Whatsapp();
             $request = $wp->genericPayload($this->payload, $this->tokenApp, $this->phone_id);

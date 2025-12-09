@@ -15,6 +15,12 @@ return [
 
     'default' => env('QUEUE_CONNECTION', 'sync'),
 
+    // ⚡ AGREGAR ESTO
+    'batch' => [
+        'database' => env('DB_CONNECTION', 'mysql'),
+        'table' => 'job_batches',
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Queue Connections
