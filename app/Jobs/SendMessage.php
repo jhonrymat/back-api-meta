@@ -48,14 +48,6 @@ class SendMessage implements ShouldQueue
 
     public function handle()
     {
-        // 🛑 Si el batch fue cancelado, salir inmediatamente
-        if ($this->batch()?->cancelled()) {
-            Log::info('Batch cancelado, job omitido', [
-                'wa_id' => $this->payload['to'] ?? 'unknown'
-            ]);
-            return;
-        }
-
         // 🛑 Si el batch fue cancelado, no continuar
         try {
             $wp = new Whatsapp();
@@ -176,21 +168,9 @@ class SendMessage implements ShouldQueue
      */
     public function failed(Exception $exception)
     {
-        // Liberar el batch primero para evitar deadlocks
-        if ($batch = $this->batch()) {
-            try {
-                // No hacer nada con el batch aquí, Laravel ya lo maneja
-            } catch (Exception $e) {
-                Log::error('Error al procesar batch en failed()', [
-                    'error' => $e->getMessage()
-                ]);
-            }
-        }
-
-        Log::error('❌ SendMessage Job falló definitivamente', [
+        Log::error('❌ SendMessage Job falló', [
             'payload_to' => $this->payload['to'] ?? 'unknown',
-            'exception' => $exception->getMessage(),
-            'attempts' => $this->attempts(),
+            'exception' => $exception->getMessage()
         ]);
     }
 }
