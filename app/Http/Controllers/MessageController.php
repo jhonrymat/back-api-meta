@@ -866,35 +866,80 @@ class MessageController extends Controller
                         new SendMessage($tokenApp, $phone_id, $payload, $personalizedBody, $messageData, $distintivo)
                     );
                 }
-                $envio = new Envio();
-                $envio->nombrePlantilla = $templateName;
-                $envio->numeroDestinatarios = count($recipients);
-                $envio->status = 'Pendiente';
-                $envio->body = $personalizedBody;
-                $envio->tag = $tags;
-                $envio->save();
+                // 🔒 Guardar envío con transacción
+                $envio = DB::transaction(function () use ($templateName, $recipients, $personalizedBody, $tags, $user) {
+                    $envio = new Envio();
+                    $envio->nombrePlantilla = $templateName;
+                    $envio->numeroDestinatarios = count($recipients);
+                    $envio->status = 'Pendiente';
+                    $envio->body = $personalizedBody;
+                    $envio->tag = $tags;
+                    $envio->save();
 
-                $user->envios()->syncWithoutDetaching([$envio->id]);
+                    $user->envios()->syncWithoutDetaching([$envio->id]);
+
+                    return $envio;
+                });
 
 
                 // 👇 Despacha el batch y guarda el ID
 
+                // 🚀 Despachar batch con configuraciones optimizadas
                 $batch = Bus::batch($jobs)
+                    ->name("Envío Masivo: {$templateName} ({$envio->id})")
                     ->then(function (Batch $batch) use ($envio, $user) {
-                        $envio->status = 'Completado';
-                        $envio->save();
-                        Log::info("✅ Batch finalizado con éxito: ID {$batch->id}");
-                        // sendNotification
+                        // ✅ Actualizar usando query builder (más rápido que Eloquent)
+                        DB::table('envios')
+                            ->where('id', $envio->id)
+                            ->update([
+                                'status' => 'Completado',
+                                'updated_at' => now()
+                            ]);
+
+                        Log::info("✅ Batch completado", [
+                            'batch_id' => $batch->id,
+                            'envio_id' => $envio->id,
+                            'processed' => $batch->processedJobs(),
+                            'failed' => $batch->failedJobs
+                        ]);
+
+                        // 🔔 Notificar al usuario (asíncrono)
                         dispatch(new SendNotificationJob($user));
                     })
                     ->catch(function (Batch $batch, Throwable $e) use ($envio) {
-                        $envio->status = 'Fallido';
-                        $envio->save();
-                        Log::error("❌ Batch ID {$batch->id} falló: {$e->getMessage()}");
+                        // ❌ Marcar como fallido
+                        DB::table('envios')
+                            ->where('id', $envio->id)
+                            ->update([
+                                'status' => 'Fallido',
+                                'updated_at' => now()
+                            ]);
+
+                        Log::error("❌ Batch falló", [
+                            'batch_id' => $batch->id,
+                            'envio_id' => $envio->id,
+                            'error' => $e->getMessage(),
+                            'failed_jobs' => $batch->failedJobs
+                        ]);
+                    })
+                    ->finally(function (Batch $batch) use ($envio) {
+                        // 📊 Log final con estadísticas
+                        Log::info("📊 Batch finalizado", [
+                            'batch_id' => $batch->id,
+                            'envio_id' => $envio->id,
+                            'total_jobs' => $batch->totalJobs,
+                            'processed' => $batch->processedJobs(),
+                            'pending' => $batch->pendingJobs,
+                            'failed' => $batch->failedJobs,
+                            'progress' => $batch->progress(),
+                            'cancelled' => $batch->cancelled()
+                        ]);
                     })
                     ->onQueue('whatsapp-queue')
+                    ->allowFailures() // ⚠️ IMPORTANTE: No cancelar todo el batch si algunos jobs fallan
                     ->dispatch();
 
+                // 💾 Actualizar batch_id
                 $envio->batch_id = $batch->id;
                 $envio->save();
 
@@ -915,9 +960,9 @@ class MessageController extends Controller
                 }
                 return response()->json([
                     'success' => true,
-                    'message' => 'Envío encolado correctamente.',
+                    'message' => $envio->id . " - Envío encolado correctamente.",
                     'batch_id' => $batch->id,
-                    'queued' => $jobs->count(),
+                    'total_recipients' => count($recipients)
                 ], 202); // <- una sola respuesta y listo
             }
 
@@ -964,5 +1009,82 @@ class MessageController extends Controller
         return $wam;
     }
 
+    public function getEnvioStatus($id)
+    {
+        try {
+            $envio = Envio::findOrFail($id);
+
+            // Verificar que el usuario tenga acceso
+            if (!auth()->user()->envios->contains($envio->id)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No autorizado'
+                ], 403);
+            }
+
+            // Si tiene batch_id, obtener info del batch
+            $batchInfo = null;
+            if ($envio->batch_id) {
+                try {
+                    $batch = Bus::findBatch($envio->batch_id);
+
+                    if ($batch) {
+                        $batchInfo = [
+                            'total' => $batch->totalJobs,
+                            'processed' => $batch->processedJobs(),
+                            'pending' => $batch->pendingJobs,
+                            'failed' => $batch->failedJobs,
+                            'progress' => $batch->progress(),
+                            'finished' => $batch->finished(),
+                            'cancelled' => $batch->cancelled(),
+                        ];
+                    }
+                } catch (Exception $e) {
+                    Log::warning("No se pudo obtener info del batch: {$e->getMessage()}");
+                }
+            }
+
+            // Respuesta
+            return response()->json([
+                'success' => true,
+                'envio' => [
+                    'id' => $envio->id,
+                    'nombre_plantilla' => $envio->nombrePlantilla,
+                    'status' => $envio->status,
+                    'numero_destinatarios' => $envio->numeroDestinatarios,
+                    'batch_id' => $envio->batch_id,
+                    'created_at' => $envio->created_at->format('Y-m-d H:i:s'),
+                    'updated_at' => $envio->updated_at->format('Y-m-d H:i:s'),
+                ],
+                'batch' => $batchInfo,
+            ]);
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Envío no encontrado'
+            ], 404);
+
+        } catch (Exception $e) {
+            Log::error("Error obteniendo status de envío: {$e->getMessage()}");
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener estado del envío'
+            ], 500);
+        }
+    }
+
+    public function monitorearEnvio($id)
+    {
+        $envio = Envio::findOrFail($id);
+
+        // Verificar autorización
+        if (!auth()->user()->envios->contains($envio->id)) {
+            abort(403, 'No autorizado');
+        }
+
+        return view('envios.monitor', compact('envio'));
+    }
 
 }

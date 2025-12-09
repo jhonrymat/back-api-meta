@@ -13,6 +13,7 @@
             <p>{{ $message }}</p>
         </div>
     @endif
+
     <table id="enviosTable" class="table table-striped table-bordered shadow-lg mt-4 display compact" style="width:100%">
         <thead class="bg-primary text-white">
             <tr>
@@ -28,7 +29,7 @@
         </thead>
         <tbody style="text-align: center">
             @foreach ($envios as $app)
-                <tr>
+                <tr id="envio-row-{{ $app->id }}">
                     <th>{{ $app->id }}</th>
                     <th>{{ $app->nombrePlantilla }}</th>
                     <td>{{ $app->numeroDestinatarios }}</td>
@@ -48,8 +49,8 @@
                                 etiqueta</span>
                         @endif
                     </td>
-                    <td>{{ $app->created_at }}</td>
-                    <td>
+                    <td>{{ $app->created_at->format('Y-m-d H:i') }}</td>
+                    <td id="status-cell-{{ $app->id }}">
                         @if ($app->status == 'Pendiente')
                             <span class="badge badge-warning">{{ $app->status }}</span>
                         @elseif($app->status == 'Completado')
@@ -60,30 +61,58 @@
                             <span class="badge badge-secondary">Sin estado</span>
                         @endif
 
+                        {{-- Barra de progreso para envíos pendientes con batch_id --}}
                         @if ($app->batch_id && $app->status === 'Pendiente')
-                            <div id="progress-{{ $app->id }}" class="progress mt-2" style="height: 10px;">
-                                <div class="progress-bar bg-info" role="progressbar" style="width: 0%" aria-valuenow="0"
-                                    aria-valuemin="0" aria-valuemax="100">
+                            <div id="progress-{{ $app->id }}" class="mt-2" style="width: 100%;">
+                                <div class="progress" style="height: 20px;">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-info"
+                                        role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0"
+                                        aria-valuemax="100">
+                                        0%
+                                    </div>
                                 </div>
+                                <small class="text-muted" id="progress-text-{{ $app->id }}">
+                                    Iniciando...
+                                </small>
                             </div>
                         @endif
                     </td>
                     <td>
+                        {{-- Ver detalles --}}
                         <a data-toggle="modal" data-target="#modal-show-{{ $app->id }}"
-                            class="btn btn-warning btn-sm mb-2" title="Ver">
+                            class="btn btn-warning btn-sm mb-2" title="Ver detalles">
                             <i class="fa fa-eye"></i>
                         </a>
+
+                        {{-- Monitorear en página dedicada (si está pendiente) --}}
+                        @if ($app->batch_id && $app->status === 'Pendiente')
+                            <a href="{{ route('envios.monitor', $app->id) }}" class="btn btn-info btn-sm mb-2"
+                                title="Monitorear en detalle" target="_blank">
+                                <i class="fa fa-chart-line"></i>
+                            </a>
+                        @endif
                     </td>
                 </tr>
-                {{-- modal show --}}
+                {{-- Modal show --}}
                 @include('envios.modals.show-modal')
             @endforeach
         </tbody>
     </table>
 @endsection
+
 @section('css')
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
+    <style>
+        .progress {
+            background-color: #f3f4f6;
+            border-radius: 4px;
+        }
+
+        .progress-bar {
+            transition: width 0.6s ease;
+        }
+    </style>
 @stop
 
 @section('js')
@@ -91,43 +120,169 @@
     <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
     <script>
+        // Inicializar DataTable
         new DataTable('#enviosTable', {
             "order": [
                 [0, "desc"]
-            ] // Ordenar por la primera columna (created_at) de manera descendente
+            ], // Ordenar por ID descendente
+            "pageLength": 25
         });
+
+        // =====================================================
+        // SISTEMA DE POLLING PARA ENVÍOS PENDIENTES
+        // =====================================================
+        const enviosPendientes = [];
 
         @foreach ($envios as $app)
             @if ($app->batch_id && $app->status == 'Pendiente')
-                (function pollBatch_{{ $app->id }}() {
-                    $.ajax({
-                        url: 'estado-envio/{{ $app->id }}',
-                        method: 'GET',
-                        success: function(data) {
-                            const porcentaje = data.progreso;
-                            const barra = document.querySelector(
-                                '#progress-{{ $app->id }} .progress-bar');
-                            if (barra) {
-                                barra.style.width = porcentaje + '%';
-                                barra.setAttribute('aria-valuenow', porcentaje);
-                                barra.textContent = porcentaje + '%';
-                                if (porcentaje >= 100) {
-                                    barra.classList.remove('bg-info');
-                                    barra.classList.add('bg-success');
-                                } else {
-                                    // Si aún no se ha completado, volver a consultar en 10 segundos
-                                    setTimeout(pollBatch_{{ $app->id }}, 10000);
-                                }
-                            }
-                        },
-                        error: function() {
-                            console.warn('No se pudo obtener el estado del envío {{ $app->id }}');
-                        }
-                    });
-                })();
+                enviosPendientes.push({
+                    id: {{ $app->id }},
+                    batchId: "{{ $app->batch_id }}",
+                    interval: null
+                });
             @endif
         @endforeach
+
+        // Función para actualizar estado de un envío
+        function actualizarEstadoEnvio(envio) {
+            $.ajax({
+                url: '{{ url('admin/envios') }}/' + envio.id + '/status',
+                method: 'GET',
+                success: function(response) {
+                    if (!response.success) {
+                        console.warn('Error en respuesta para envío ' + envio.id);
+                        return;
+                    }
+
+                    const batchInfo = response.batch;
+
+                    if (!batchInfo) {
+                        console.warn('No hay info de batch para envío ' + envio.id);
+                        return;
+                    }
+
+                    // Actualizar barra de progreso
+                    const progreso = Math.round(batchInfo.progress);
+                    const barra = $('#progress-' + envio.id + ' .progress-bar');
+                    const texto = $('#progress-text-' + envio.id);
+
+                    if (barra.length) {
+                        barra.css('width', progreso + '%');
+                        barra.attr('aria-valuenow', progreso);
+                        barra.text(progreso + '%');
+                    }
+
+                    // Actualizar texto de progreso
+                    if (texto.length) {
+                        texto.text(`${batchInfo.processed} de ${batchInfo.total} enviados`);
+
+                        if (batchInfo.failed > 0) {
+                            texto.append(` · <span class="text-danger">${batchInfo.failed} fallidos</span>`);
+                        }
+                    }
+
+                    // Verificar si completó o falló
+                    if (batchInfo.finished) {
+                        // Detener polling
+                        clearInterval(envio.interval);
+
+                        // Actualizar barra de progreso
+                        if (barra.length) {
+                            barra.removeClass('progress-bar-animated progress-bar-striped bg-info');
+
+                            if (batchInfo.failed === 0 || batchInfo.failed < batchInfo.total * 0.1) {
+                                // Éxito (menos del 10% fallidos)
+                                barra.addClass('bg-success');
+                                if (texto.length) {
+                                    texto.html('<span class="text-success">✓ Completado</span>');
+                                }
+                            } else {
+                                // Algunos fallos
+                                barra.addClass('bg-warning');
+                                if (texto.length) {
+                                    texto.html('<span class="text-warning">⚠ Completado con errores</span>');
+                                }
+                            }
+                        }
+
+                        // Actualizar badge de estado
+                        const statusCell = $('#status-cell-' + envio.id);
+                        const badge = statusCell.find('.badge');
+
+                        if (response.envio.status === 'Completado') {
+                            badge.removeClass('badge-warning').addClass('badge-success');
+                            badge.text('Completado');
+                        } else if (response.envio.status === 'Fallido') {
+                            badge.removeClass('badge-warning').addClass('badge-danger');
+                            badge.text('Fallido');
+                        }
+
+                        // Notificación opcional
+                        console.log(`✅ Envío ${envio.id} finalizado`);
+
+                        // Opcional: Mostrar notificación toast
+                        // toastr.success(`Envío #${envio.id} completado`);
+                    } else if (batchInfo.cancelled) {
+                        // Envío cancelado
+                        clearInterval(envio.interval);
+
+                        if (barra.length) {
+                            barra.removeClass('progress-bar-animated bg-info');
+                            barra.addClass('bg-secondary');
+                        }
+
+                        if (texto.length) {
+                            texto.html('<span class="text-muted">⊗ Cancelado</span>');
+                        }
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error actualizando envío ' + envio.id + ':', error);
+
+                    // Si el error es 404, el batch ya no existe
+                    if (xhr.status === 404) {
+                        clearInterval(envio.interval);
+                    }
+                }
+            });
+        }
+
+        // Iniciar polling para cada envío pendiente
+        enviosPendientes.forEach(function(envio) {
+            // Primera actualización inmediata
+            actualizarEstadoEnvio(envio);
+
+            // Polling cada 5 segundos
+            envio.interval = setInterval(function() {
+                actualizarEstadoEnvio(envio);
+            }, 5000);
+        });
+
+        // Limpiar intervalos al salir de la página
+        window.addEventListener('beforeunload', function() {
+            enviosPendientes.forEach(function(envio) {
+                if (envio.interval) {
+                    clearInterval(envio.interval);
+                }
+            });
+        });
+
+        // =====================================================
+        // OPCIONAL: Notificaciones Desktop
+        // =====================================================
+
+        // Pedir permiso para notificaciones
+        if ("Notification" in window && Notification.permission === "default") {
+            Notification.requestPermission();
+        }
+
+        function mostrarNotificacion(titulo, mensaje) {
+            if ("Notification" in window && Notification.permission === "granted") {
+                new Notification(titulo, {
+                    body: mensaje,
+                    icon: '/favicon.ico'
+                });
+            }
+        }
     </script>
-
-
 @stop

@@ -175,6 +175,13 @@ Route::get('message-contactos/info', [ContactoController::class, 'getByWaId']);
 //envios de errores
 Route::post('log-client-error', [ErrorLogController::class, 'store'])->middleware('can:log-client-error')->name('log-client-error');
 
+Route::get('envios/{id}/status', [MessageController::class, 'getEnvioStatus'])
+    ->middleware('auth')
+    ->name('envios.status');
+
+Route::get('envios/{id}/monitor', [MessageController::class, 'monitorearEnvio'])
+    ->middleware('auth')
+    ->name('envios.monitor');
 //verificar si no esta inactiva la sesion del usuario
 
 

@@ -748,58 +748,118 @@
                 },
                 async: true,
                 success: function(response) {
-                    // Ocultar el mensaje de carga
+                    // Cerrar loader
                     Swal.close();
 
-                    //limpiar formularo
+                    // ✅ Respuesta inmediata del backend
+                    // El batch se procesa en segundo plano
+
+                    // Extraer info de la respuesta
+                    const envioId = response.envio_id || 'N/A';
+                    const totalRecipients = response.total_recipients || 0;
+                    const message = response.message || 'Envío encolado correctamente';
+
+                    // Limpiar formulario
                     $('#createSend').trigger("reset");
 
-                    // Mostrar SweetAlert con la respuesta
+                    // Mostrar success con más info
                     Swal.fire({
-                        title: '¡Enviado!',
-                        text: 'Tu mensaje ha sido enviado correctamente.'
+                        icon: 'success',
+                        title: '¡Envío Encolado!',
+                        html: `
+                    <p><strong>ID de Envío:</strong> ${envioId}</p>
+                    <p><strong>Destinatarios:</strong> ${totalRecipients}</p>
+                    <p class="text-muted mt-3">
+                        Los mensajes se están enviando en segundo plano.<br>
+                        Recibirás una notificación cuando finalice.
+                    </p>
+                `,
+                        confirmButtonText: 'Entendido',
+                        timer: 5000,
+                        timerProgressBar: true
                     }).then(() => {
-                        // Recargar la página después de cerrar el SweetAlert, independientemente de cómo se cerró
+                        // Redirigir a página de seguimiento (opcional)
+                        // window.location.href = `/envios/${envioId}`;
+
+                        // O simplemente recargar
                         window.location.reload();
                     });
                 },
+
                 error: function(xhr, status, error) {
+                    // Cerrar loader
                     Swal.close();
-                    Swal.fire({
-                        title: 'Error en el envío',
-                        text: 'No se pudo hacer el envio masivo. Inténtalo de nuevo. Error: ' +
-                            xhr.responseText,
-                        icon: 'error'
-                    });
-                    console.log('Error:', error);
-                    console.log('Status:', status);
-                    console.log('Response:', xhr.responseText);
 
-                    // Datos del error
-                    var errorData = {
-                        message: error,
+                    // Log detallado para debug
+                    console.error("❌ AJAX Error:", {
                         status: status,
-                        response: xhr.responseText,
-                        url: messageTemplatesUrl
-                    };
+                        error: error,
+                        statusCode: xhr.status,
+                        response: xhr.responseText
+                    });
 
-                    // Enviar el error al servidor
+                    // Preparar mensaje de error más claro
+                    let errorMessage = 'No se pudo encolar el envío. Inténtalo de nuevo.';
+                    let errorDetails = '';
+
+                    try {
+                        const errorData = JSON.parse(xhr.responseText);
+
+                        if (errorData.message) {
+                            errorMessage = errorData.message;
+                        }
+
+                        if (errorData.errors) {
+                            errorDetails = '<ul class="text-left mt-2">';
+                            for (const [field, messages] of Object.entries(errorData.errors)) {
+                                messages.forEach(msg => {
+                                    errorDetails += `<li>${msg}</li>`;
+                                });
+                            }
+                            errorDetails += '</ul>';
+                        }
+                    } catch (e) {
+                        // Si no es JSON, mostrar texto plano
+                        errorDetails =
+                            `<pre class="text-left text-xs mt-2">${xhr.responseText.substring(0, 300)}</pre>`;
+                    }
+
+                    // Registrar error en servidor (para análisis posterior)
                     $.ajax({
                         type: "POST",
-                        url: "/log-client-error", // Asegúrate de que esta ruta sea correcta
-                        data: errorData,
+                        url: "log-client-error",
+                        contentType: "application/json",
+                        data: JSON.stringify({
+                            error: status + ' - ' + error,
+                            details: xhr.responseText || 'No response text',
+                            status_code: xhr.status,
+                            endpoint: 'send-message-templates'
+                        }),
                         headers: {
-                            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr(
-                                'content')
+                            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                         },
-                        success: function(response) {
-                            console.log("Datos del error enviadosa al administrador");
+                        success: function() {
+                            console.log("✅ Error logged on server");
                         },
-                        error: function(xhr) {
-                            console.log(
-                                "No se pudieron enviar datos del error enviadosa al administrador"
-                            );
+                        error: function() {
+                            console.log("⚠️ Failed to log error on server");
                         }
+                    });
+
+                    // Mostrar error al usuario
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error en el Envío',
+                        html: `
+                    <p>${errorMessage}</p>
+                    ${errorDetails}
+                `,
+                        confirmButtonText: 'Cerrar',
+                        footer: xhr.status === 500 ?
+                            '<span class="text-muted">Código de error: 500 - Error del servidor</span>' :
+                            xhr.status === 422 ?
+                            '<span class="text-muted">Verifica los datos del formulario</span>' :
+                            ''
                     });
                 }
             });

@@ -591,75 +591,43 @@
         function enviarDatos(url) {
             // Preparar los datos de los placeholders como un array
             var body_placeholders = [];
-
             $('#templateDetails .format').each(function() {
                 body_placeholders.push($(this).val());
             });
 
-            // Inicializar variables en null
-            var header_type = null;
-            var header_url = null;
-            var buttons_url = null;
-            var id_c_business = null;
-            var id_c_business2 = null;
-            var phone_id2 = null;
-            var phone_id = null;
-            var recipients = null;
-            var template_language = null;
-            var template_name = null;
-            var token_api = null;
-            var programar = null;
-            var selectedTags = null;
-            var distintivoSelect = null;
-
-            // header_url = $('#header').val() ? $('#header').val() :
-            //     null;
-            // Luego, asignar valores a las variables
-            header_type = templateType; // Ahora asignas el valor deseado
-            header_url = url;
-            // Recoger botones dinámicos como objetos {index, text}
-            // ya no declares de nuevo; solo asigna
-            buttons_url = (function() {
-                const first = $('input[name="button_text[]"]').map(function() {
-                    const t = ($(this).val() || '').trim();
-                    return t || null;
-                }).get().find(Boolean) || null;
-                return first;
-            })();
-
-            id_c_business2 = $('#selectPlantilla option:selected').data('id_c_business');
-            id_c_business = id_c_business2.toString();
-            phone_id2 = $('#selectPlantilla option:selected').data(
-                'id_telefono'); // Ahora asignas el valor deseado, si es dinámico, ajusta
-            phone_id = phone_id2.toString();
-            recipients = $('#exampleFormControlTextarea1')
-                .val(); // Ahora asignas el valor deseado, si es dinámico, ajusta
-            template_language = templateLanguage; // Ahora asignas el valor deseado
-            template_name = templateName; // Ahora asignas el valor deseado
-            token_api = $('#selectPlantilla option:selected').data('token_api');
-            programar = $('#programar').val() ? $('#programar').val() :
-                null;
-            // Obtener los IDs seleccionados en el select con id "etiqueta"
-            selectedTags = $('#etiqueta').val();
-            distintivoSelect = $('#distintivoSelect').val() ? $('#distintivoSelect').val() : null;
-
-
             // Organizar la información en un objeto
             var dataToSend = {
                 body_placeholders: body_placeholders,
-                header_type: header_type,
-                header_url: header_url,
-                buttons_url: buttons_url,
-                id_c_business: id_c_business,
-                phone_id: phone_id,
-                recipients: recipients,
-                template_language: template_language,
-                template_name: template_name,
-                token_api: token_api,
-                programar: programar,
-                selectedTags: selectedTags,
-                distintivoSelect: distintivoSelect
+                header_type: templateType,
+                header_url: url,
+                buttons_url: (function() {
+                    const first = $('input[name="button_text[]"]').map(function() {
+                        const t = ($(this).val() || '').trim();
+                        return t || null;
+                    }).get().find(Boolean) || null;
+                    return first;
+                })(),
+                id_c_business: $('#selectPlantilla option:selected').data('id_c_business')?.toString(),
+                phone_id: $('#selectPlantilla option:selected').data('id_telefono')?.toString(),
+                recipients: $('#exampleFormControlTextarea1').val(),
+                template_language: templateLanguage,
+                template_name: templateName,
+                token_api: $('#selectPlantilla option:selected').data('token_api'),
+                programar: $('#programar').val() || null,
+                selectedTags: $('#etiqueta').val(),
+                distintivoSelect: $('#distintivoSelect').val() || null
             };
+
+            // Mostrar loader
+            Swal.fire({
+                title: 'Encolando mensajes...',
+                text: 'Por favor espera',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
             $.ajax({
                 type: "POST",
                 url: "send-message-templates",
@@ -669,59 +637,121 @@
                     'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                 },
                 async: true,
+                timeout: 30000, // ⚡ 30 segundos máximo (suficiente para respuesta inmediata)
+
                 success: function(response) {
-                    // Ocultar el mensaje de carga
+                    // Cerrar loader
                     Swal.close();
 
-                    //limpiar formularo
+                    // ✅ Respuesta inmediata del backend
+                    // El batch se procesa en segundo plano
+
+                    // Extraer info de la respuesta
+                    const envioId = response.envio_id || 'N/A';
+                    const totalRecipients = response.total_recipients || 0;
+                    const message = response.message || 'Envío encolado correctamente';
+
+                    // Limpiar formulario
                     $('#createSend').trigger("reset");
 
-                    // Mostrar SweetAlert con la respuesta
+                    // Mostrar success con más info
                     Swal.fire({
-                        title: '¡Enviado!',
-                        text: 'Tu mensaje ha sido enviado correctamente.'
+                        icon: 'success',
+                        title: '¡Envío Encolado!',
+                        html: `
+                    <p><strong>ID de Envío:</strong> ${envioId}</p>
+                    <p><strong>Destinatarios:</strong> ${totalRecipients}</p>
+                    <p class="text-muted mt-3">
+                        Los mensajes se están enviando en segundo plano.<br>
+                        Recibirás una notificación cuando finalice.
+                    </p>
+                `,
+                        confirmButtonText: 'Entendido',
+                        timer: 5000,
+                        timerProgressBar: true
                     }).then(() => {
-                        // Recargar la página después de cerrar el SweetAlert, independientemente de cómo se cerró
+                        // Redirigir a página de seguimiento (opcional)
+                        // window.location.href = `/envios/${envioId}`;
+
+                        // O simplemente recargar
                         window.location.reload();
                     });
                 },
+
                 error: function(xhr, status, error) {
-                    // Ocultar el mensaje de carga
+                    // Cerrar loader
                     Swal.close();
 
-                    // Mostrar detalles del error en la consola para depuración
-                    console.error("AJAX Error: ", status, error);
-                    console.error("Response Text: ", xhr.responseText);
-                    console.error("Status Code: ", xhr.status);
+                    // Log detallado para debug
+                    console.error("❌ AJAX Error:", {
+                        status: status,
+                        error: error,
+                        statusCode: xhr.status,
+                        response: xhr.responseText
+                    });
 
+                    // Preparar mensaje de error más claro
+                    let errorMessage = 'No se pudo encolar el envío. Inténtalo de nuevo.';
+                    let errorDetails = '';
 
-                    // Preparar datos de error
-                    var errorData = {
-                        error: status + ' - ' + error,
-                        details: xhr.responseText || 'No response text.'
-                    };
+                    try {
+                        const errorData = JSON.parse(xhr.responseText);
 
-                    // Enviar error al servidor para registro
+                        if (errorData.message) {
+                            errorMessage = errorData.message;
+                        }
+
+                        if (errorData.errors) {
+                            errorDetails = '<ul class="text-left mt-2">';
+                            for (const [field, messages] of Object.entries(errorData.errors)) {
+                                messages.forEach(msg => {
+                                    errorDetails += `<li>${msg}</li>`;
+                                });
+                            }
+                            errorDetails += '</ul>';
+                        }
+                    } catch (e) {
+                        // Si no es JSON, mostrar texto plano
+                        errorDetails =
+                            `<pre class="text-left text-xs mt-2">${xhr.responseText.substring(0, 300)}</pre>`;
+                    }
+
+                    // Registrar error en servidor (para análisis posterior)
                     $.ajax({
                         type: "POST",
                         url: "log-client-error",
-                        data: errorData,
+                        contentType: "application/json",
+                        data: JSON.stringify({
+                            error: status + ' - ' + error,
+                            details: xhr.responseText || 'No response text',
+                            status_code: xhr.status,
+                            endpoint: 'send-message-templates'
+                        }),
                         headers: {
                             'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                         },
-                        success: function(response) {
-                            console.log("Error logged in server");
+                        success: function() {
+                            console.log("✅ Error logged on server");
                         },
-                        error: function(xhr) {
-                            console.log("Failed to log error on server");
+                        error: function() {
+                            console.log("⚠️ Failed to log error on server");
                         }
                     });
 
-                    // Mostrar SweetAlert con detalles del error
+                    // Mostrar error al usuario
                     Swal.fire({
-                        title: 'Error en el envío',
-                        text: 'No se pudo enviar el mensaje. Inténtalo de nuevo. Detalles: ' + xhr
-                            .responseText
+                        icon: 'error',
+                        title: 'Error en el Envío',
+                        html: `
+                    <p>${errorMessage}</p>
+                    ${errorDetails}
+                `,
+                        confirmButtonText: 'Cerrar',
+                        footer: xhr.status === 500 ?
+                            '<span class="text-muted">Código de error: 500 - Error del servidor</span>' :
+                            xhr.status === 422 ?
+                            '<span class="text-muted">Verifica los datos del formulario</span>' :
+                            ''
                     });
                 }
             });

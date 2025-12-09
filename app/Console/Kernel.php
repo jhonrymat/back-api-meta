@@ -42,6 +42,9 @@ class Kernel extends ConsoleKernel
                 '--fecha' => now()->subDay()->toDateString(),
             ]);
         })->dailyAt('01:00');
+
+        $schedule->command('batches:monitor')->hourly();
+
     }
 
     /**
