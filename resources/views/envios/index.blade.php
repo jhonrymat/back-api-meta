@@ -55,6 +55,8 @@
                             <span class="badge badge-warning">{{ $app->status }}</span>
                         @elseif($app->status == 'Completado')
                             <span class="badge badge-success">{{ $app->status }}</span>
+                        @elseif($app->status == 'Completado con errores')
+                            <span class="badge badge-warning">{{ $app->status }}</span>
                         @elseif($app->status == 'Fallido')
                             <span class="badge badge-danger">{{ $app->status }}</span>
                         @else
