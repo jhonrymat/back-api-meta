@@ -87,7 +87,7 @@
                         </a>
 
                         {{-- Monitorear en página dedicada (si está pendiente) --}}
-                        @if ($app->batch_id && $app->status === 'Pendiente')
+                        @if ($app->batch_id && ($app->status === 'Pendiente' || $app->status === 'Completado con errores'))
                             <a href="{{ route('envios.monitor', $app->id) }}" class="btn btn-info btn-sm mb-2"
                                 title="Monitorear en detalle" target="_blank">
                                 <i class="fa fa-chart-line"></i>
