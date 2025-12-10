@@ -345,7 +345,7 @@
                         cancelButtonText: 'Cerrar'
                     }).then((result) => {
                         if (result.isConfirmed) {
-                            window.location.href = `/envios/${envioId}/monitor`;
+                            window.location.href = `/admin/envios/${envioId}/monitor`;
                         } else {
                             window.location.reload();
                         }
