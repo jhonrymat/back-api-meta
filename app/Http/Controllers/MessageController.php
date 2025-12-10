@@ -1076,4 +1076,158 @@ class MessageController extends Controller
         return view('envios.monitor', compact('envio'));
     }
 
+    /**
+     * API: Reintentar mensajes fallidos de un envío
+     * Ruta: POST /envios/{id}/reintentar
+     */
+    public function reintentarEnvio($id)
+    {
+        try {
+            // Buscar el envío
+            $envio = Envio::findOrFail($id);
+
+            // Verificar autorización
+            $user = auth()->user();
+            if (!$user->envios->contains($envio->id)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No autorizado para reintentar este envío'
+                ], 403);
+            }
+
+            // Verificar que tenga batch_id
+            if (!$envio->batch_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Este envío no tiene batch asociado'
+                ], 400);
+            }
+
+            // Buscar jobs fallidos relacionados con este envío
+            $failedJobs = DB::table('failed_jobs')
+                ->where(function ($query) use ($envio) {
+                    $query->where('payload', 'like', "%{$envio->batch_id}%")
+                        ->orWhere('payload', 'like', "%distintivo\":\"{$envio->distintivo}%");
+                })
+                ->limit(100) // Límite de seguridad
+                ->get();
+
+            if ($failedJobs->isEmpty()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'No hay jobs fallidos para reintentar',
+                    'reintentados' => 0
+                ]);
+            }
+
+            // Reintentar cada job
+            $reintentados = 0;
+            $errores = 0;
+
+            foreach ($failedJobs as $failedJob) {
+                try {
+                    // Usar el comando de Laravel para reintentar
+                    Artisan::call('queue:retry', ['id' => $failedJob->uuid]);
+                    $reintentados++;
+                } catch (Exception $e) {
+                    $errores++;
+                    Log::error("Error reintentando job {$failedJob->uuid}: {$e->getMessage()}");
+                }
+            }
+
+            // Actualizar estado del envío
+            if ($reintentados > 0) {
+                DB::table('envios')
+                    ->where('id', $envio->id)
+                    ->update([
+                        'status' => 'Pendiente',
+                        'updated_at' => now()
+                    ]);
+
+                Log::info("Envío reintentado", [
+                    'envio_id' => $envio->id,
+                    'reintentados' => $reintentados,
+                    'errores' => $errores,
+                    'user_id' => $user->id
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "Jobs reintentados correctamente",
+                'reintentados' => $reintentados,
+                'errores' => $errores,
+                'envio_id' => $envio->id
+            ]);
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Envío no encontrado'
+            ], 404);
+
+        } catch (Exception $e) {
+            Log::error("Error reintentando envío {$id}: {$e->getMessage()}");
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al reintentar el envío'
+            ], 500);
+        }
+    }
+
+    /**
+     * OPCIONAL: Ver detalles de jobs fallidos
+     * Ruta: GET /envios/{id}/fallidos
+     */
+    public function verJobsFallidos($id)
+    {
+        try {
+            $envio = Envio::findOrFail($id);
+
+            // Verificar autorización
+            if (!auth()->user()->envios->contains($envio->id)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No autorizado'
+                ], 403);
+            }
+
+            // Buscar jobs fallidos
+            $failedJobs = DB::table('failed_jobs')
+                ->where('payload', 'like', "%{$envio->batch_id}%")
+                ->select('id', 'uuid', 'exception', 'failed_at')
+                ->orderBy('failed_at', 'desc')
+                ->limit(50)
+                ->get();
+
+            // Extraer números de teléfono del payload
+            $failedJobs = $failedJobs->map(function ($job) {
+                $payload = json_decode($job->payload, true);
+                $command = unserialize($payload['data']['command'] ?? '');
+
+                return [
+                    'uuid' => $job->uuid,
+                    'telefono' => $command->payload['to'] ?? 'N/A',
+                    'error' => substr($job->exception, 0, 200),
+                    'fecha' => $job->failed_at
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'failed_jobs' => $failedJobs,
+                'total' => $failedJobs->count()
+            ]);
+
+        } catch (Exception $e) {
+            Log::error("Error obteniendo jobs fallidos: {$e->getMessage()}");
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener jobs fallidos'
+            ], 500);
+        }
+    }
+
 }

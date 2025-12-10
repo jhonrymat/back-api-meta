@@ -55,7 +55,7 @@
                             <span class="badge badge-warning">{{ $app->status }}</span>
                         @elseif($app->status == 'Completado')
                             <span class="badge badge-success">{{ $app->status }}</span>
-                        @elseif($app->status == 'Completado con errores')
+                        @elseif($app->status == 'Fallido')
                             <span class="badge badge-danger">{{ $app->status }}</span>
                         @else
                             <span class="badge badge-secondary">Sin estado</span>
@@ -90,6 +90,14 @@
                                 title="Monitorear en detalle" target="_blank">
                                 <i class="fa fa-chart-line"></i>
                             </a>
+                        @endif
+
+                        {{-- 🔄 NUEVO: Botón de reintentar (si falló o está incompleto) --}}
+                        @if (in_array($app->status, ['Fallido', 'Completado con errores', 'Pendiente']))
+                            <button onclick="reintentarEnvio({{ $app->id }})" class="btn btn-danger btn-sm mb-2"
+                                title="Reintentar mensajes fallidos" id="btn-reintentar-{{ $app->id }}">
+                                <i class="fa fa-redo"></i>
+                            </button>
                         @endif
                     </td>
                 </tr>
@@ -212,9 +220,9 @@
                         if (response.envio.status === 'Completado') {
                             badge.removeClass('badge-warning').addClass('badge-success');
                             badge.text('Completado');
-                        } else if (response.envio.status === 'Completado con errores') {
+                        } else if (response.envio.status === 'Fallido') {
                             badge.removeClass('badge-warning').addClass('badge-danger');
-                            badge.text('Completado con errores');
+                            badge.text('Fallido');
                         }
 
                         // Notificación opcional
@@ -283,6 +291,67 @@
                     icon: '/favicon.ico'
                 });
             }
+        }
+
+    </script>
+
+    <script>
+        function reintentarEnvio(envioId) {
+            Swal.fire({
+                title: '¿Reintentar envío?',
+                html: `
+            <p>Se reintentarán todos los mensajes fallidos del envío #${envioId}</p>
+            <p class="text-muted">Los workers procesarán los mensajes automáticamente</p>
+        `,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#28a745',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Sí, reintentar',
+                cancelButtonText: 'Cancelar',
+                showLoaderOnConfirm: true,
+                preConfirm: () => {
+                    return $.ajax({
+                        url: `/admin/envios/${envioId}/reintentar`,
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                        }
+                    }).then(response => {
+                        return response;
+                    }).catch(error => {
+                        Swal.showValidationMessage(
+                            `Error: ${error.responseJSON?.message || 'No se pudo reintentar'}`
+                        );
+                    });
+                },
+                allowOutsideClick: () => !Swal.isLoading()
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const data = result.value;
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: '¡Reintentando!',
+                        html: `
+                    <p><strong>Jobs reintentados:</strong> ${data.reintentados || 0}</p>
+                    <p class="text-muted mt-3">
+                        Los mensajes se están procesando en segundo plano.<br>
+                        Actualiza la página en unos minutos para ver el progreso.
+                    </p>
+                `,
+                        confirmButtonText: 'Ver Progreso',
+                        showCancelButton: true,
+                        cancelButtonText: 'Cerrar'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            window.location.href = `/envios/${envioId}/monitor`;
+                        } else {
+                            window.location.reload();
+                        }
+                    });
+                }
+            });
         }
     </script>
 @stop

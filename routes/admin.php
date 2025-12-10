@@ -180,6 +180,16 @@ Route::get('envios/{id}/status', [MessageController::class, 'getEnvioStatus'])
 
 Route::get('envios/{id}/monitor', [MessageController::class, 'monitorearEnvio'])
     ->name('envios.monitor');
+
+// Reintentar envío desde el navegador
+Route::post('envios/{id}/reintentar', [MessageController::class, 'reintentarEnvio'])
+    ->middleware('auth')
+    ->name('envios.reintentar');
+
+// Ver jobs fallidos de un envío (opcional)
+Route::get('envios/{id}/fallidos', [MessageController::class, 'verJobsFallidos'])
+    ->middleware('auth')
+    ->name('envios.fallidos');
 //verificar si no esta inactiva la sesion del usuario
 
 
