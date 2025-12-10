@@ -16,7 +16,6 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        \Log::info('✅ Scheduler ejecutado correctamente: ' . now());
         $schedule->command('send:task --scheduled')
             ->everyFiveMinutes()
             ->when(function () {

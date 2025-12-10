@@ -64,35 +64,113 @@ class ClocalController extends Controller
     public function storeData(Request $request)
     {
         try {
-            // Convertir 'publicacion' y 'tag' a string si es necesario, dependiendo de cómo lo manejes en la base de datos
+            // Log de los datos recibidos
+            Log::info('=== INICIO storeData ===');
+            Log::info('Datos recibidos:', $request->all());
+
+            // Validar que los datos críticos existen
+            Log::info('Validando campos requeridos...');
+
+            // Convertir 'publicacion' y 'tag' a string
             $publicacion = json_encode($request->publicacion);
             $tag = json_encode($request->tag);
 
+            Log::info('Publicación convertida:', ['publicacion' => $publicacion]);
+            Log::info('Tag convertido:', ['tag' => $tag]);
+
+            // Crear instancia del modelo
+            Log::info('Creando instancia de Clocal...');
             $cl = new Clocal();
+
+            // Asignar valores uno por uno con logs
+            Log::info('Asignando valores al modelo...');
             $cl->empresa = $request->empresa;
+            Log::debug('empresa asignado');
+
             $cl->id_pdf = $request->id_pdf;
+            Log::debug('id_pdf asignado');
+
             $cl->contrato = $request->contrato;
+            Log::debug('contrato asignado');
+
             $cl->publicacion = $publicacion;
+            Log::debug('publicacion asignado');
+
             $cl->codigo_contrato = $request->codigo_contrato;
+            Log::debug('codigo_contrato asignado');
+
             $cl->tipo_orden_id = $request->tipo_orden_id;
+            Log::debug('tipo_orden_id asignado');
+
             $cl->orden_servicio = $request->orden_servicio;
+            Log::debug('orden_servicio asignado');
+
             $cl->desc_general_act = $request->desc_general_act;
+            Log::debug('desc_general_act asignado');
+
             $cl->objeto = $request->objeto;
+            Log::debug('objeto asignado');
+
             $cl->requerimientos = $request->requerimientos;
+            Log::debug('requerimientos asignado');
+
             $cl->tiempo_ejecucion = $request->tiempo_ejecucion;
+            Log::debug('tiempo_ejecucion asignado');
+
             $cl->fecha_inicio = $request->fecha_inicio;
+            Log::debug('fecha_inicio asignado');
+
             $cl->fecha_recibo = $request->fecha_recibo;
+            Log::debug('fecha_recibo asignado');
+
             $cl->hora_limite = $request->hora_limite;
+            Log::debug('hora_limite asignado');
+
             $cl->tag = $tag;
+            Log::debug('tag asignado');
+
             $cl->estado = $request->estado;
+            Log::debug('estado asignado');
+
             $cl->status = 'pendiente';
+            Log::debug('status asignado');
+
+            // Intentar guardar
+            Log::info('Intentando guardar en la base de datos...');
             $cl->save();
+
+            Log::info('Registro guardado exitosamente con ID: ' . $cl->id);
+            Log::info('=== FIN storeData EXITOSO ===');
+
             return response()->json(['success' => 'Data almacenada con éxito.']);
+
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Error específico de base de datos
+            Log::error('=== ERROR DE BASE DE DATOS ===');
+            Log::error('Código de error SQL: ' . $e->getCode());
+            Log::error('Mensaje: ' . $e->getMessage());
+            Log::error('SQL: ' . $e->getSql());
+            Log::error('Bindings: ', $e->getBindings());
+
+            return response()->json([
+                'error' => 'Error de base de datos.',
+                'message' => $e->getMessage(),
+                'code' => $e->getCode()
+            ], 500);
+
         } catch (\Exception $e) {
-            Log::error('Error al almacenar en la base de datos: ' . $e->getMessage());
+            // Error general
+            Log::error('=== ERROR GENERAL ===');
+            Log::error('Mensaje: ' . $e->getMessage());
+            Log::error('Archivo: ' . $e->getFile());
+            Log::error('Línea: ' . $e->getLine());
+            Log::error('Stack trace: ' . $e->getTraceAsString());
+
             return response()->json([
                 'error' => 'Hubo un problema al almacenar la data.',
-                'message' => $e->getMessage() // Aquí se envía el mensaje de error específico
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
             ], 500);
         }
     }
