@@ -50,30 +50,35 @@
         </div>
     </div>
 
-    @if ($enviosRecientes->where('status', 'Pendiente')->count() > 0)
-        <script>
-            // Polling para envíos pendientes
-            @foreach ($enviosRecientes->where('status', 'Pendiente') as $envio)
-                (function pollEnvio_{{ $envio->id }}() {
-                    $.ajax({
-                        url: 'admin/email-envios/{{ $envio->id }}/status',
-                        success: function(data) {
-                            if (data.batch) {
-                                const prog = Math.round(data.batch.progress);
-                                const bar = $('#progress-{{ $envio->id }} .progress-bar');
-                                bar.css('width', prog + '%').text(prog + '%');
 
-                                if (!data.batch.finished) {
-                                    setTimeout(pollEnvio_{{ $envio->id }}, 5000);
-                                } else {
-                                    bar.removeClass('bg-info').addClass('bg-success');
-                                    location.reload();
-                                }
+@endsection
+
+@section('js')
+    <script src="https://code.jquery.com/jquery-3.7.0.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+    <script>
+        // Polling para envíos pendientes
+        @foreach ($enviosRecientes->where('status', 'Pendiente') as $envio)
+            (function pollEnvio_{{ $envio->id }}() {
+                $.ajax({
+                    url: '/admin/email-envios/{{ $envio->id }}/status',
+                    success: function(data) {
+                        if (data.batch) {
+                            const prog = Math.round(data.batch.progress);
+                            const bar = $('#progress-{{ $envio->id }} .progress-bar');
+                            bar.css('width', prog + '%').text(prog + '%');
+
+                            if (!data.batch.finished) {
+                                setTimeout(pollEnvio_{{ $envio->id }}, 5000);
+                            } else {
+                                bar.removeClass('bg-info').addClass('bg-success');
+                                location.reload();
                             }
                         }
-                    });
-                })();
-            @endforeach
-        </script>
-    @endif
-@endsection
+                    }
+                });
+            })();
+        @endforeach
+    </script>
+@stop

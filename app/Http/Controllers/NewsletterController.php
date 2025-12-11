@@ -213,7 +213,7 @@ class NewsletterController extends Controller
             return back()->with('error', 'No hay destinatarios para enviar.');
         }
 
-        // Crear registro de envío
+        // ⚡ CAMBIO 1: Crear envío PRIMERO
         $envio = EmailEnvio::create([
             'newsletter_id' => $newsletter->id,
             'user_id' => auth()->id(),
@@ -224,7 +224,7 @@ class NewsletterController extends Controller
                 : null,
         ]);
 
-        // Crear jobs collection
+        // ⚡ CAMBIO 2: Crear jobs collection
         $jobs = collect();
 
         foreach ($recipients as $recipient) {
@@ -241,69 +241,72 @@ class NewsletterController extends Controller
             );
         }
 
-        // Despachar batch de forma asíncrona
-        dispatch(function () use ($jobs, $envio, $newsletter, $validated) {
-            $batch = Bus::batch($jobs)
-                ->name("Email Newsletter: {$newsletter->subject} ({$envio->id})")
-                ->then(function (Batch $batch) use ($envio, $newsletter) {
-                    DB::table('email_envios')
-                        ->where('id', $envio->id)
-                        ->update([
-                            'status' => 'Completado',
-                            'updated_at' => now()
-                        ]);
-
-                    // Marcar newsletter como enviado
-                    $newsletter->update(['is_sent' => true]);
-
-                    Log::info("✅ Email batch completado", [
-                        'batch_id' => $batch->id,
-                        'envio_id' => $envio->id
+        // ⚡ CAMBIO 3: Crear batch INMEDIATAMENTE (sin afterResponse)
+        $batch = Bus::batch($jobs)
+            ->name("Email Newsletter: {$newsletter->subject} ({$envio->id})")
+            ->then(function (Batch $batch) use ($envio, $newsletter) {
+                DB::table('email_envios')
+                    ->where('id', $envio->id)
+                    ->update([
+                        'status' => 'Completado',
+                        'updated_at' => now()
                     ]);
-                })
-                ->catch(function (Batch $batch, Throwable $e) use ($envio) {
-                    DB::table('email_envios')
-                        ->where('id', $envio->id)
-                        ->update([
-                            'status' => 'Completado con errores',
-                            'updated_at' => now()
-                        ]);
 
-                    Log::error("❌ Email batch con errores", [
-                        'batch_id' => $batch->id,
-                        'envio_id' => $envio->id,
-                        'error' => $e->getMessage()
+                $newsletter->update(['is_sent' => true]);
+
+                Log::info("✅ Email batch completado", [
+                    'batch_id' => $batch->id,
+                    'envio_id' => $envio->id
+                ]);
+            })
+            ->catch(function (Batch $batch, Throwable $e) use ($envio) {
+                DB::table('email_envios')
+                    ->where('id', $envio->id)
+                    ->update([
+                        'status' => 'Completado con errores',
+                        'updated_at' => now()
                     ]);
-                })
-                ->finally(function (Batch $batch) use ($envio) {
-                    Log::info("📊 Email batch finalizado", [
-                        'batch_id' => $batch->id,
-                        'envio_id' => $envio->id
-                    ]);
-                })
-                ->onQueue('email-queue')
-                ->allowFailures();
 
-            // Si es programado, agregar delay
-            if ($validated['send_type'] === 'scheduled') {
-                $scheduledDate = Carbon::parse($validated['scheduled_date']);
-                $batch->delay($scheduledDate);
-            }
+                Log::error("❌ Email batch con errores", [
+                    'batch_id' => $batch->id,
+                    'envio_id' => $envio->id,
+                    'error' => $e->getMessage()
+                ]);
+            })
+            ->finally(function (Batch $batch) use ($envio) {
+                Log::info("📊 Email batch finalizado", [
+                    'batch_id' => $batch->id,
+                    'envio_id' => $envio->id
+                ]);
+            })
+            ->onQueue('email-queue')
+            ->allowFailures();
 
-            $batch->dispatch();
+        // Si es programado, agregar delay
+        if ($validated['send_type'] === 'scheduled') {
+            $scheduledDate = Carbon::parse($validated['scheduled_date']);
+            $batch->delay($scheduledDate);
+        }
 
-            // Guardar batch_id
-            $envio->batch_id = $batch->id;
-            $envio->save();
+        // ⚡ CAMBIO 4: Despachar AHORA
+        $batch->dispatch();
 
-        })->afterResponse();
+        // ⚡ CAMBIO 5: Guardar batch_id INMEDIATAMENTE
+        $envio->batch_id = $batch->id;
+        $envio->save();
 
-        // Respuesta inmediata
+        Log::info("Newsletter encolado", [
+            'envio_id' => $envio->id,
+            'batch_id' => $batch->id,
+            'destinatarios' => $recipients->count()
+        ]);
+
+        // Respuesta
         return redirect()->route('newsletters.index')->with(
             'success',
             $validated['send_type'] === 'scheduled'
-            ? "Newsletter programado. ID de envío: {$envio->id}"
-            : "Newsletter encolado. ID de envío: {$envio->id}"
+            ? "Newsletter programado. ID: {$envio->id}"
+            : "Newsletter encolado. ID: {$envio->id}"
         );
     }
 
