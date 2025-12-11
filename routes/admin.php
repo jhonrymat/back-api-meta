@@ -226,7 +226,11 @@ Route::resource('newsletters', NewsletterController::class);
 Route::get('newsletters/{newsletter}/recipients/count', [NewsletterController::class, 'countRecipients']);
 Route::patch('newsletters/{newsletter}/cancel', [NewsletterController::class, 'cancel'])->name('newsletters.cancel');
 Route::get('newsletters/{newsletter}/recipients/count', [NewsletterController::class, 'count'])->name('newsletters.recipients.count');
+// API para obtener estado del envío
+Route::get('email-envios/{id}/status', [NewsletterController::class, 'getEnvioStatus'])
+    ->name('email-envios.status');
 
+Route::get('masivos', [NewsletterController::class, 'masivos'])->name('newsletters.masivos');
 //conteo de menajes diarios:
 Route::get('/conteo/por-dia', [ConteoController::class, 'verPorDia'])->middleware('can:plantillas')->name('conteo.por-dia');
 
