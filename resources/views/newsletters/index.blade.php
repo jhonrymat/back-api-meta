@@ -270,18 +270,40 @@
         // Prevenir múltiples envíos
         const newsletterForm = document.getElementById('sendNewsletterForm');
         const submitButton = newsletterForm.querySelector('button[type="submit"]');
+        let isSubmitting = false;
 
         newsletterForm.addEventListener('submit', function(e) {
-            // Deshabilitar el botón
+            // Prevenir múltiples envíos
+            if (isSubmitting) {
+                e.preventDefault();
+                return false;
+            }
+
+            isSubmitting = true;
             submitButton.disabled = true;
             submitButton.innerHTML =
                 '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Enviando...';
 
-            // Opcional: Re-habilitar después de 3 segundos por si hay error de validación
+            // Cerrar modal y mostrar mensaje después de 1 segundo
             setTimeout(() => {
+                const modal = bootstrap.Modal.getInstance(document.getElementById('sendNewsletterModal'));
+                if (modal) {
+                    modal.hide();
+                }
+
+                Swal.fire({
+                    title: '¡Enviado!',
+                    text: 'El boletín se está procesando en segundo plano.',
+                    icon: 'success',
+                    confirmButtonText: 'Aceptar'
+                });
+
+                // Reset del formulario y botón
+                newsletterForm.reset();
+                isSubmitting = false;
                 submitButton.disabled = false;
                 submitButton.innerHTML = 'Enviar';
-            }, 3000);
+            }, 1000);
         });
 
         @if (session('success'))
@@ -293,5 +315,4 @@
             });
         @endif
     </script>
-
 @endsection
