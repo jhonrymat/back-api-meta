@@ -251,7 +251,7 @@
                     .then(r => r.json())
                     .then(data => {
                         counter.innerText = (data && typeof data.count !== 'undefined') ? data.count :
-                            0;
+                        0;
                     })
                     .catch(() => {
                         counter.innerText = 0;
@@ -267,6 +267,23 @@
             });
         });
 
+        // Prevenir múltiples envíos
+        const newsletterForm = document.getElementById('sendNewsletterForm');
+        const submitButton = newsletterForm.querySelector('button[type="submit"]');
+
+        newsletterForm.addEventListener('submit', function(e) {
+            // Deshabilitar el botón
+            submitButton.disabled = true;
+            submitButton.innerHTML =
+                '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Enviando...';
+
+            // Opcional: Re-habilitar después de 3 segundos por si hay error de validación
+            setTimeout(() => {
+                submitButton.disabled = false;
+                submitButton.innerHTML = 'Enviar';
+            }, 3000);
+        });
+
         @if (session('success'))
             Swal.fire({
                 title: '¡Éxito!',
@@ -276,5 +293,5 @@
             });
         @endif
     </script>
-    
+
 @endsection

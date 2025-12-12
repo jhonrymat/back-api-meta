@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Database\Eloquent\Model;
 
 class EmailEnvio extends Model
@@ -27,5 +28,14 @@ class EmailEnvio extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function getBatchStats()
+    {
+        if (!$this->batch_id) {
+            return null;
+        }
+
+        return Bus::findBatch($this->batch_id);
     }
 }
