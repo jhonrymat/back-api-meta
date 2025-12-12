@@ -391,32 +391,34 @@ return [
                 ],
                 // Informes Section
                 [
-                    'text' => 'Informes',
+                    'text' => 'Análisis',
                     'icon' => 'fas fa-fw fa-flag',
                     'submenu' => [
                         [
-                            'text' => 'Estadisticas',
+                            'text' => 'Resumen',
                             'route' => 'estadisticas',
                             'can' => 'estadisticas',
                             'icon' => 'fas fa-fw fa-chart-line',
                         ],
                         [
-                            'text' => 'Historial de envió',
+                            'text' => 'Masivos',
                             'route' => 'envios-plantillas',
                             'can' => 'envios-plantillas',
-                            'icon' => 'fas fa-fw fa-chart-line',
+                            'icon' => 'fas fa-fw fa-history',
+                            'label' => 'Nuevo',
+                            'label_color' => 'success',
                         ],
                         [
-                            'text' => 'Envios por día',
+                            'text' => 'Diarios',
                             'route' => 'conteo.por-dia',
                             'can' => 'plantillas',
-                            'icon' => 'fas fa-fw fa-hourglass-end',
+                            'icon' => 'fas fa-fw fa-calendar-day',
                         ],
                         [
-                            'text' => 'Registro de envíos',
+                            'text' => 'Destinatarios',
                             'route' => 'envios',
                             'can' => 'estadisticas',
-                            'icon' => 'fas fa-fw fa-calendar-alt',
+                            'icon' => 'fas fa-fw fa-users',
                             'target' => '_blank',
                         ],
                     ],
@@ -484,6 +486,8 @@ return [
                     'text' => 'envios masivos',
                     'route' => 'newsletters.masivos',
                     'icon' => 'fas fa-fw fa-poll',
+                    'label' => 'Nuevo',  // Aquí se agrega el tag
+                    'label_color' => 'success',  // Aquí se puede elegir el color del tag (puede ser 'success', 'warning', 'danger', etc.)
                 ],
                 // [
                 //     'text' => 'Reportes',
