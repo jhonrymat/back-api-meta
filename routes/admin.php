@@ -33,6 +33,7 @@ use App\Http\Controllers\AplicacionesController;
 use App\Http\Controllers\EstadisticasController;
 use App\Http\Controllers\ProgramadosControllers;
 use App\Http\Controllers\EmailTemplateController;
+use App\Http\Controllers\CorreccionContratoController;
 
 Route::resource(
     'aplicaciones',
@@ -327,3 +328,13 @@ Route::get('verificar-contacto/{wa_id}', function ($wa_id) {
     return response()->json(['pertenece' => $pertenece]);
 })->middleware('auth:sanctum'); // o tu middleware de autenticación
 
+Route::middleware(['auth'])->prefix('correcciones')->group(function () {
+    Route::get('/', [CorreccionContratoController::class, 'index'])->name('correcciones.index');
+    Route::get('/probar-conexion', [CorreccionContratoController::class, 'probarConexion'])->name('correcciones.probar-conexion');
+    Route::post('/buscar-contrato', [CorreccionContratoController::class, 'buscarContrato'])->name('correcciones.buscar');
+    Route::post('/actualizar-contrato', [CorreccionContratoController::class, 'actualizarContrato'])->name('correcciones.actualizar-contrato');
+    Route::post('/obtener-necesidades', [CorreccionContratoController::class, 'obtenerNecesidades'])->name('correcciones.necesidades');
+    Route::post('/actualizar-necesidad', [CorreccionContratoController::class, 'actualizarNecesidad'])->name('correcciones.actualizar-necesidad');
+    Route::post('/obtener-resultados', [CorreccionContratoController::class, 'obtenerResultados'])->name('correcciones.resultados');
+    Route::post('/actualizar-resultado', [CorreccionContratoController::class, 'actualizarResultado'])->name('correcciones.actualizar-resultado');
+});

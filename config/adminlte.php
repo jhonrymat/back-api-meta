@@ -387,6 +387,14 @@ return [
                             'can' => 'solicitudes',
                             'icon' => 'fab fa-fw fa-readme',
                         ],
+                        [
+                            'text' => 'Correcciones',
+                            'route' => 'correcciones.index',
+                            'can' => 'solicitudes',
+                            'icon' => 'fas fa-fw fa-edit',
+                            'label' => 'Nuevo',
+                            'label_color' => 'success',
+                        ],
                     ],
                 ],
                 // Informes Section
