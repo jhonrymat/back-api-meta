@@ -226,11 +226,28 @@ class NewsletterController extends Controller
                 : null,
         ]);
 
-        // ⚡ PASO 2: Crear batch VACÍO con callbacks
-        $pendingBatch = Bus::batch([]) // ✅ Esto es un PendingBatch
+        // ⚡ PASO 2: Crear array de jobs PRIMERO
+        $jobs = [];
+        foreach ($recipients as $recipient) {
+            if (empty($recipient->email)) {
+                continue;
+            }
+
+            $jobs[] = new SendNewsletterToUserJob(
+                $recipient,
+                $newsletter,
+                $emailTemplate
+            );
+        }
+
+        if (empty($jobs)) {
+            return back()->with('error', 'No hay destinatarios válidos para enviar.');
+        }
+
+        // ⚡ PASO 3: Crear batch CON los jobs desde el inicio
+        $pendingBatch = Bus::batch($jobs) // ✅ Jobs incluidos desde el principio
             ->name("Email Newsletter: {$newsletter->subject} ({$envio->id})")
             ->then(function (Batch $batch) use ($envio, $newsletter) {
-                // Callback cuando TODO sale bien
                 DB::table('email_envios')
                     ->where('id', $envio->id)
                     ->update([
@@ -246,7 +263,6 @@ class NewsletterController extends Controller
                 ]);
             })
             ->catch(function (Batch $batch, \Throwable $e) use ($envio) {
-                // Callback cuando hay errores
                 DB::table('email_envios')
                     ->where('id', $envio->id)
                     ->update([
@@ -261,7 +277,6 @@ class NewsletterController extends Controller
                 ]);
             })
             ->finally(function (Batch $batch) use ($envio) {
-                // Fallback: Se ejecuta SIEMPRE al final
                 if ($batch->finished()) {
                     $status = $batch->failedJobs > 0 ? 'Completado con errores' : 'Completado';
 
@@ -280,38 +295,19 @@ class NewsletterController extends Controller
                 ]);
             })
             ->onQueue('email-queue')
-            ->allowFailures(); // ✅ No cancelar todo si algunos fallan
+            ->allowFailures();
 
-        // ⚡ PASO 3: Agregar delay si es programado
+        // ⚡ PASO 4: Agregar delay si es programado
         if ($validated['send_type'] === 'scheduled') {
             $pendingBatch->delay(Carbon::parse($validated['scheduled_date']));
         }
 
-        // ⚡ PASO 4: Despachar batch (AHORA sí obtenemos el Batch real)
+        // ⚡ PASO 5: Despachar batch
         $batch = $pendingBatch->dispatch();
 
-        // ⚡ PASO 5: Guardar batch_id INMEDIATAMENTE (AHORA existe $batch->id)
+        // ⚡ PASO 6: Guardar batch_id
         $envio->batch_id = $batch->id;
         $envio->save();
-
-        // ⚡ PASO 6: Crear array de jobs (NO Collection)
-        $jobs = [];
-        foreach ($recipients as $recipient) {
-            if (empty($recipient->email)) {
-                continue;
-            }
-
-            $jobs[] = new SendNewsletterToUserJob(
-                $recipient,
-                $newsletter,
-                $emailTemplate
-            );
-        }
-
-        // ⚡ PASO 7: Agregar jobs AL batch YA EXISTENTE
-        if (!empty($jobs)) {
-            $batch->add($jobs); // ✅ Esto incrementa total_jobs correctamente
-        }
 
         // Log de confirmación
         Log::info("Newsletter batch creado", [
