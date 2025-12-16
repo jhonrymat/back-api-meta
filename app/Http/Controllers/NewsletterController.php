@@ -227,7 +227,7 @@ class NewsletterController extends Controller
         ]);
 
         // ⚡ PASO 2: Crear batch VACÍO con callbacks
-        $batch = Bus::batch([]) // ✅ Array vacío, no Collection
+        $pendingBatch = Bus::batch([]) // ✅ Esto es un PendingBatch
             ->name("Email Newsletter: {$newsletter->subject} ({$envio->id})")
             ->then(function (Batch $batch) use ($envio, $newsletter) {
                 // Callback cuando TODO sale bien
@@ -284,13 +284,13 @@ class NewsletterController extends Controller
 
         // ⚡ PASO 3: Agregar delay si es programado
         if ($validated['send_type'] === 'scheduled') {
-            $batch->delay(Carbon::parse($validated['scheduled_date']));
+            $pendingBatch->delay(Carbon::parse($validated['scheduled_date']));
         }
 
-        // ⚡ PASO 4: Despachar batch (esto lo guarda en BD)
-        $batch->dispatch();
+        // ⚡ PASO 4: Despachar batch (AHORA sí obtenemos el Batch real)
+        $batch = $pendingBatch->dispatch();
 
-        // ⚡ PASO 5: Guardar batch_id INMEDIATAMENTE
+        // ⚡ PASO 5: Guardar batch_id INMEDIATAMENTE (AHORA existe $batch->id)
         $envio->batch_id = $batch->id;
         $envio->save();
 
