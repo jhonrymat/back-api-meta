@@ -21,7 +21,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach ($enviosRecientes as $envio)
+                    @forelse($enviosRecientes as $envio)
                         <tr>
                             <td>{{ $envio->id }}</td>
                             <td>{{ $envio->newsletter->subject }}</td>
@@ -44,7 +44,11 @@
                                 @endif
                             </td>
                         </tr>
-                    @endforeach
+                    @empty
+                        <tr>
+                            <td colspan="6" class="text-center">No hay envíos recientes</td>
+                        </tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>
@@ -57,28 +61,31 @@
     <script src="https://code.jquery.com/jquery-3.7.0.js" crossorigin="anonymous"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
-    <script>
-        // Polling para envíos pendientes
-        @foreach ($enviosRecientes->where('status', 'Pendiente') as $envio)
-            (function pollEnvio_{{ $envio->id }}() {
-                $.ajax({
-                    url: '/admin/email-envios/{{ $envio->id }}/status',
-                    success: function(data) {
-                        if (data.batch) {
-                            const prog = Math.round(data.batch.progress);
-                            const bar = $('#progress-{{ $envio->id }} .progress-bar');
-                            bar.css('width', prog + '%').text(prog + '%');
+    @if ($enviosRecientes->where('status', 'Pendiente')->count() > 0)
+        <script>
+            // Polling para envíos pendientes
+            @foreach ($enviosRecientes->where('status', 'Pendiente') as $envio)
+                (function pollEnvio_{{ $envio->id }}() {
+                    $.ajax({
+                        url: '/admin/email-envios/{{ $envio->id }}/status',
+                        success: function(data) {
+                            if (data.batch) {
+                                const prog = Math.round(data.batch.progress);
+                                const bar = $('#progress-{{ $envio->id }} .progress-bar');
+                                bar.css('width', prog + '%').text(prog + '%');
 
-                            if (!data.batch.finished) {
-                                setTimeout(pollEnvio_{{ $envio->id }}, 5000);
-                            } else {
-                                bar.removeClass('bg-info').addClass('bg-success');
-                                location.reload();
+                                if (data.batch.finished) {
+                                    bar.removeClass('progress-bar-animated');
+                                    bar.addClass('bg-success');
+                                    setTimeout(() => location.reload(), 2000);
+                                } else {
+                                    setTimeout(pollEnvio_{{ $envio->id }}, 5000);
+                                }
                             }
                         }
-                    }
-                });
-            })();
-        @endforeach
-    </script>
+                    });
+                })();
+            @endforeach
+        </script>
+    @endif
 @stop

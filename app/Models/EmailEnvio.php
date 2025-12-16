@@ -30,12 +30,19 @@ class EmailEnvio extends Model
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * Obtener estadísticas del batch
+     */
     public function getBatchStats()
     {
         if (!$this->batch_id) {
             return null;
         }
 
-        return Bus::findBatch($this->batch_id);
+        try {
+            return Bus::findBatch($this->batch_id);
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 }
