@@ -498,28 +498,6 @@ class NewsletterController extends Controller
         return view('newsletters.masivos.index', compact('envios'));
     }
 
-    /**
-     * Listar envíos con filtros
-     */
-    public function indexEnvios(Request $request)
-    {
-        $query = EmailEnvio::with('newsletter', 'user')
-            ->where('user_id', auth()->id())
-            ->latest();
-
-        // Filtros opcionales
-        if ($request->has('status') && $request->status !== 'all') {
-            $query->where('status', $request->status);
-        }
-
-        if ($request->has('newsletter_id')) {
-            $query->where('newsletter_id', $request->newsletter_id);
-        }
-
-        $envios = $query->paginate(20);
-
-        return view('email-envios.index', compact('envios'));
-    }
 
     /**
      * Vista de monitoreo detallado

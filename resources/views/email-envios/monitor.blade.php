@@ -5,7 +5,7 @@
 @section('content_header')
     <div class="d-flex justify-content-between align-items-center">
         <h1>Monitoreo de Envío #{{ $envio->id }}</h1>
-        <a href="{{ route('email-envios.index') }}" class="btn btn-secondary">
+        <a href="{{ route('newsletters.masivos') }}" class="btn btn-secondary">
             <i class="fa fa-arrow-left"></i> Volver
         </a>
     </div>

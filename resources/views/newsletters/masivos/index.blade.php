@@ -26,7 +26,7 @@
     {{-- Filtros --}}
     <div class="card">
         <div class="card-body">
-            <form method="GET" action="{{ route('email-envios.index') }}" class="form-inline">
+            <form method="GET" action="{{ route('newsletters.masivos') }}" class="form-inline">
                 <label class="mr-2">Filtrar por estado:</label>
                 <select name="status" class="form-control mr-2">
                     <option value="all">Todos</option>
@@ -39,7 +39,7 @@
                 <button type="submit" class="btn btn-primary mr-2">
                     <i class="fa fa-filter"></i> Filtrar
                 </button>
-                <a href="{{ route('email-envios.index') }}" class="btn btn-secondary">
+                <a href="{{ route('newsletters.masivos') }}" class="btn btn-secondary">
                     <i class="fa fa-times"></i> Limpiar
                 </a>
             </form>
