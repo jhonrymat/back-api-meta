@@ -302,25 +302,29 @@ class NewsletterController extends Controller
             $batch->delay($scheduledDate);
         }
 
-        // ⚡ PASO 4: Despachar
-        $batch->dispatch();
+        // ⚡ PASO 4: Despachar PRIMERO para generar el ID
+        $dispatchedBatch = $batch->dispatch();
 
-        // ⚡ PASO 5: Guardar batch_id usando el MODELO (no update)
-        $envio->batch_id = $batch->id;
+        // ⚡ PASO 5: AHORA SÍ guardar batch_id (después de dispatch)
+        $envio->batch_id = $dispatchedBatch->id;
         $envio->save();
 
         // ✅ VERIFICAR que se guardó
-        $envio->refresh();
         if (empty($envio->batch_id)) {
-            Log::warning('⚠️ batch_id no se guardó correctamente', [
+            Log::error('❌ batch_id no se guardó', [
                 'envio_id' => $envio->id,
-                'batch_id' => $batch->id
+                'batch_id' => $dispatchedBatch->id
+            ]);
+        } else {
+            Log::info('✅ batch_id guardado correctamente', [
+                'envio_id' => $envio->id,
+                'batch_id' => $envio->batch_id
             ]);
         }
 
         Log::info('Newsletter encolado correctamente', [
             'envio_id' => $envio->id,
-            'batch_id' => $batch->id,
+            'batch_id' => $dispatchedBatch->id,
             'batch_id_guardado' => $envio->batch_id,
             'total_jobs' => count($jobs),
             'scheduled' => $validated['send_type'] === 'scheduled'
@@ -330,7 +334,7 @@ class NewsletterController extends Controller
             'success',
             $validated['send_type'] === 'scheduled'
             ? "Newsletter programado para {$validated['scheduled_date']}. ID: {$envio->id}"
-            : "Newsletter encolado correctamente. Batch: {$batch->id}, Emails: " . count($jobs)
+            : "Newsletter encolado correctamente. Batch: {$dispatchedBatch->id}, Emails: " . count($jobs)
         );
     }
 
