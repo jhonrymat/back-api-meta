@@ -214,7 +214,7 @@ class NewsletterController extends Controller
             return back()->with('error', 'No hay destinatarios para enviar.');
         }
 
-        // ⚡ PASO 1: Crear array de jobs (NO Collection)
+        // ⚡ PASO 1: Crear array de jobs
         $jobs = [];
         foreach ($recipients as $recipient) {
             if (empty($recipient->email)) {
@@ -228,85 +228,95 @@ class NewsletterController extends Controller
             );
         }
 
-        // ⚡ PASO 2: Crear registro de envío con transacción
-        $envio = DB::transaction(function () use ($newsletter, $recipients, $validated) {
-            $envio = EmailEnvio::create([
+        // ✅ VALIDAR que hay jobs para enviar
+        if (empty($jobs)) {
+            return back()->with('error', 'No hay destinatarios válidos con email.');
+        }
+
+        // ⚡ PASO 2: Crear registro de envío
+        $envio = DB::transaction(function () use ($newsletter, $jobs, $validated) {
+            return EmailEnvio::create([
                 'newsletter_id' => $newsletter->id,
                 'user_id' => auth()->id(),
-                'numero_destinatarios' => $recipients->count(),
+                'numero_destinatarios' => count($jobs), // ✅ Usar count($jobs), no $recipients
                 'status' => 'Pendiente',
                 'scheduled_at' => $validated['send_type'] === 'scheduled'
                     ? Carbon::parse($validated['scheduled_date'])
                     : null,
             ]);
-
-            return $envio;
         });
 
-        // ⚡ PASO 3: Crear y despachar batch (igual que WhatsApp)
+        // ⚡ PASO 3: Crear batch con callbacks simplificados
         $batch = Bus::batch($jobs)
             ->name("Email Newsletter: {$newsletter->subject} ({$envio->id})")
-            ->then(function (Batch $batch) use ($envio, $newsletter) {
-                DB::table('email_envios')
-                    ->where('id', $envio->id)
-                    ->update([
-                        'status' => 'Completado',
-                        'updated_at' => now()
-                    ]);
+            ->then(function (Batch $batch) use ($envio) {
+                // ✅ Usar query builder directo sin variables externas
+                EmailEnvio::where('id', $envio->id)->update([
+                    'status' => 'Completado',
+                    'updated_at' => now()
+                ]);
 
-                $newsletter->update(['is_sent' => true]);
+                // ✅ Actualizar newsletter usando query builder
+                Newsletter::where('id', $envio->newsletter_id)->update([
+                    'is_sent' => true
+                ]);
 
                 Log::info("✅ Email batch completado", [
                     'batch_id' => $batch->id,
-                    'envio_id' => $envio->id
+                    'envio_id' => $envio->id,
+                    'processed' => $batch->processedJobs(),
+                    'failed' => $batch->failedJobs()
                 ]);
             })
             ->catch(function (Batch $batch, Throwable $e) use ($envio) {
-                DB::table('email_envios')
-                    ->where('id', $envio->id)
-                    ->update([
-                        'status' => 'Completado con errores',
-                        'updated_at' => now()
-                    ]);
+                EmailEnvio::where('id', $envio->id)->update([
+                    'status' => 'Completado con errores',
+                    'updated_at' => now()
+                ]);
 
                 Log::error("❌ Email batch con errores", [
                     'batch_id' => $batch->id,
                     'envio_id' => $envio->id,
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
+                    'failed_jobs' => $batch->failedJobs()
                 ]);
             })
             ->finally(function (Batch $batch) use ($envio) {
                 Log::info("📊 Email batch finalizado", [
                     'batch_id' => $batch->id,
-                    'envio_id' => $envio->id
+                    'envio_id' => $envio->id,
+                    'total' => $batch->totalJobs,
+                    'processed' => $batch->processedJobs(),
+                    'failed' => $batch->failedJobs()
                 ]);
             })
             ->onQueue('email-queue')
-            ->allowFailures();
+            ->allowFailures(); // ✅ Mantener esto para que no cancele todo el batch
 
-        // Delay si es programado
+        // ✅ APLICAR DELAY ANTES DE DISPATCH (no después)
         if ($validated['send_type'] === 'scheduled') {
-            $batch->delay(Carbon::parse($validated['scheduled_date']));
+            $scheduledDate = Carbon::parse($validated['scheduled_date']);
+            $batch->delay($scheduledDate);
         }
 
-        // ⚡ PASO 4: Despachar (AHORA SÍ existe $batch->id)
+        // ⚡ PASO 4: Despachar
         $batch->dispatch();
 
-        // ⚡ PASO 5: Guardar batch_id DESPUÉS de dispatch
-        $envio->batch_id = $batch->id;
-        $envio->save();
+        // ⚡ PASO 5: Guardar batch_id
+        $envio->update(['batch_id' => $batch->id]);
 
-        Log::info('Newsletter encolado', [
+        Log::info('Newsletter encolado correctamente', [
             'envio_id' => $envio->id,
             'batch_id' => $batch->id,
-            'total_jobs' => count($jobs)
+            'total_jobs' => count($jobs),
+            'scheduled' => $validated['send_type'] === 'scheduled'
         ]);
 
         return redirect()->route('newsletters.index')->with(
             'success',
             $validated['send_type'] === 'scheduled'
-            ? "Newsletter programado. ID: {$envio->id}"
-            : "Newsletter encolado. ID: {$envio->id}, Emails: " . count($jobs)
+            ? "Newsletter programado para {$validated['scheduled_date']}. ID: {$envio->id}"
+            : "Newsletter encolado correctamente. Batch: {$batch->id}, Emails: " . count($jobs)
         );
     }
 
