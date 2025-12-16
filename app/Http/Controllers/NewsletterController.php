@@ -477,16 +477,204 @@ class NewsletterController extends Controller
         return view('newsletters.show', compact('newsletter'));
     }
 
-    public function masivos()
+    public function masivos(Request $request)
     {
-        $newsletters = Newsletter::latest()->paginate(20);
-        $enviosRecientes = EmailEnvio::with('newsletter')
+        $query = EmailEnvio::with('newsletter', 'user')
             ->where('user_id', auth()->id())
-            ->latest()
-            ->take(10)
-            ->get();
+            ->latest();
 
-        return view('newsletters.masivos.index', compact('newsletters', 'enviosRecientes'));
+
+        // Filtros opcionales
+        if ($request->has('status') && $request->status !== 'all') {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->has('newsletter_id')) {
+            $query->where('newsletter_id', $request->newsletter_id);
+        }
+
+        $envios = $query->paginate(20);
+
+        return view('newsletters.masivos.index', compact('envios'));
+    }
+
+    /**
+     * Listar envíos con filtros
+     */
+    public function indexEnvios(Request $request)
+    {
+        $query = EmailEnvio::with('newsletter', 'user')
+            ->where('user_id', auth()->id())
+            ->latest();
+
+        // Filtros opcionales
+        if ($request->has('status') && $request->status !== 'all') {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->has('newsletter_id')) {
+            $query->where('newsletter_id', $request->newsletter_id);
+        }
+
+        $envios = $query->paginate(20);
+
+        return view('email-envios.index', compact('envios'));
+    }
+
+    /**
+     * Vista de monitoreo detallado
+     */
+    public function monitorearEnvio($id)
+    {
+        $envio = EmailEnvio::with('newsletter')->findOrFail($id);
+
+        // Verificar autorización
+        if ($envio->user_id !== auth()->id()) {
+            abort(403, 'No autorizado');
+        }
+
+        return view('email-envios.monitor', compact('envio'));
+    }
+
+    /**
+     * Reintentar jobs fallidos de un batch
+     */
+    public function retryFailed($id)
+    {
+        try {
+            $envio = EmailEnvio::findOrFail($id);
+
+            // Verificar autorización
+            if ($envio->user_id !== auth()->id()) {
+                return back()->with('error', 'No autorizado');
+            }
+
+            if (!$envio->batch_id) {
+                return back()->with('error', 'Este envío no tiene batch asociado');
+            }
+
+            // Obtener batch
+            $batch = Bus::findBatch($envio->batch_id);
+
+            if (!$batch) {
+                return back()->with('error', 'Batch no encontrado');
+            }
+
+            // Contar jobs fallidos
+            $failedCount = DB::table('failed_jobs')
+                ->where('payload', 'like', "%{$envio->batch_id}%")
+                ->count();
+
+            if ($failedCount === 0) {
+                return back()->with('info', 'No hay jobs fallidos para reintentar');
+            }
+
+            // Reintentar todos los fallidos de este batch
+            $failedJobs = DB::table('failed_jobs')
+                ->where('payload', 'like', "%{$envio->batch_id}%")
+                ->get();
+
+            $retriedCount = 0;
+            foreach ($failedJobs as $failedJob) {
+                try {
+                    \Artisan::call('queue:retry', ['id' => $failedJob->uuid]);
+                    $retriedCount++;
+                } catch (\Exception $e) {
+                    Log::error("Error reintentando job {$failedJob->uuid}: {$e->getMessage()}");
+                }
+            }
+
+            // Actualizar status si estaba fallido
+            if ($envio->status === 'Fallido' || $envio->status === 'Completado con errores') {
+                $envio->status = 'Pendiente';
+                $envio->save();
+            }
+
+            return back()->with('success', "Se reintentaron {$retriedCount} emails fallidos");
+
+        } catch (\Exception $e) {
+            Log::error("Error reintentando envío: {$e->getMessage()}");
+            return back()->with('error', 'Error al reintentar: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Cancelar envío en progreso
+     */
+    public function cancelarEnvio($id)
+    {
+        try {
+            $envio = EmailEnvio::findOrFail($id);
+
+            // Verificar autorización
+            if ($envio->user_id !== auth()->id()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No autorizado'
+                ], 403);
+            }
+
+            if (!$envio->batch_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No hay batch para cancelar'
+                ], 400);
+            }
+
+            $batch = Bus::findBatch($envio->batch_id);
+
+            if (!$batch) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Batch no encontrado'
+                ], 404);
+            }
+
+            if ($batch->finished()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El envío ya finalizó'
+                ], 400);
+            }
+
+            // Cancelar batch
+            $batch->cancel();
+
+            // Actualizar status
+            $envio->status = 'Cancelado';
+            $envio->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Envío cancelado correctamente'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al cancelar'
+            ], 500);
+        }
+    }
+
+    /**
+     * Estadísticas generales
+     */
+    public function estadisticas()
+    {
+        $stats = [
+            'total' => EmailEnvio::where('user_id', auth()->id())->count(),
+            'pendientes' => EmailEnvio::where('user_id', auth()->id())
+                ->where('status', 'Pendiente')->count(),
+            'completados' => EmailEnvio::where('user_id', auth()->id())
+                ->where('status', 'Completado')->count(),
+            'fallidos' => EmailEnvio::where('user_id', auth()->id())
+                ->whereIn('status', ['Fallido', 'Completado con errores'])->count(),
+            'total_emails' => EmailEnvio::where('user_id', auth()->id())
+                ->sum('numero_destinatarios'),
+        ];
+
+        return response()->json($stats);
     }
 
 }

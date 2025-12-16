@@ -228,12 +228,28 @@ Route::get('newsletters/{newsletter}/recipients/count', [NewsletterController::c
 Route::patch('newsletters/{newsletter}/cancel', [NewsletterController::class, 'cancel'])->name('newsletters.cancel');
 Route::get('newsletters/{newsletter}/recipients/count', [NewsletterController::class, 'count'])->name('newsletters.recipients.count');
 // API para obtener estado del envío
-Route::get('email-envios/{id}/status', [NewsletterController::class, 'getEnvioStatus'])
-    ->name('email-envios.status');
 
 Route::get('masivos', [NewsletterController::class, 'masivos'])->name('newsletters.masivos');
 //conteo de menajes diarios:
 Route::get('/conteo/por-dia', [ConteoController::class, 'verPorDia'])->middleware('can:plantillas')->name('conteo.por-dia');
+
+
+// Rutas para la gestión de envíos masivos
+// Monitoreo detallado
+Route::get('email-envios/{id}/monitor', [NewsletterController::class, 'monitorearEnvio'])->name('email-envios.monitor');
+
+// Estado del envío (API)
+Route::get('email-envios/{id}/status', [NewsletterController::class, 'getEnvioStatus'])->name('email-envios.status');
+
+// Reintentar fallidos
+Route::post('email-envios/{id}/retry', [NewsletterController::class, 'retryFailed'])->name('email-envios.retry');
+
+// Cancelar envío
+Route::post('email-envios/{id}/cancel', [NewsletterController::class, 'cancelarEnvio'])->name('email-envios.cancel');
+
+// Estadísticas
+Route::get('email-envios/stats', [NewsletterController::class, 'estadisticas'])->name('email-envios.stats');
+
 
 // Genera todas las rutas necesarias para el recurso EmailTemplate
 Route::get('email-templates', [EmailTemplateController::class, 'index'])->name('email-templates.index');
