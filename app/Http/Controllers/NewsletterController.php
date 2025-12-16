@@ -238,7 +238,7 @@ class NewsletterController extends Controller
             return EmailEnvio::create([
                 'newsletter_id' => $newsletter->id,
                 'user_id' => auth()->id(),
-                'numero_destinatarios' => count($jobs), // ✅ Usar count($jobs), no $recipients
+                'numero_destinatarios' => count($jobs),
                 'status' => 'Pendiente',
                 'scheduled_at' => $validated['send_type'] === 'scheduled'
                     ? Carbon::parse($validated['scheduled_date'])
@@ -246,17 +246,17 @@ class NewsletterController extends Controller
             ]);
         });
 
-        // ⚡ PASO 3: Crear batch con callbacks simplificados
+        // ⚡ PASO 3: Crear batch con callbacks corregidos
         $batch = Bus::batch($jobs)
             ->name("Email Newsletter: {$newsletter->subject} ({$envio->id})")
             ->then(function (Batch $batch) use ($envio) {
-                // ✅ Usar query builder directo sin variables externas
+                // ✅ Actualizar envío
                 EmailEnvio::where('id', $envio->id)->update([
                     'status' => 'Completado',
                     'updated_at' => now()
                 ]);
 
-                // ✅ Actualizar newsletter usando query builder
+                // ✅ Actualizar newsletter
                 Newsletter::where('id', $envio->newsletter_id)->update([
                     'is_sent' => true
                 ]);
@@ -264,8 +264,10 @@ class NewsletterController extends Controller
                 Log::info("✅ Email batch completado", [
                     'batch_id' => $batch->id,
                     'envio_id' => $envio->id,
+                    'total' => $batch->totalJobs,
                     'processed' => $batch->processedJobs(),
-                    'failed' => $batch->failedJobs()
+                    'pending' => $batch->pendingJobs,
+                    'failed' => $batch->failedJobs  // ✅ SIN paréntesis (es propiedad)
                 ]);
             })
             ->catch(function (Batch $batch, Throwable $e) use ($envio) {
@@ -278,7 +280,7 @@ class NewsletterController extends Controller
                     'batch_id' => $batch->id,
                     'envio_id' => $envio->id,
                     'error' => $e->getMessage(),
-                    'failed_jobs' => $batch->failedJobs()
+                    'failed' => $batch->failedJobs  // ✅ SIN paréntesis
                 ]);
             })
             ->finally(function (Batch $batch) use ($envio) {
@@ -287,13 +289,14 @@ class NewsletterController extends Controller
                     'envio_id' => $envio->id,
                     'total' => $batch->totalJobs,
                     'processed' => $batch->processedJobs(),
-                    'failed' => $batch->failedJobs()
+                    'pending' => $batch->pendingJobs,
+                    'failed' => $batch->failedJobs  // ✅ SIN paréntesis
                 ]);
             })
             ->onQueue('email-queue')
-            ->allowFailures(); // ✅ Mantener esto para que no cancele todo el batch
+            ->allowFailures();
 
-        // ✅ APLICAR DELAY ANTES DE DISPATCH (no después)
+        // ✅ APLICAR DELAY ANTES DE DISPATCH
         if ($validated['send_type'] === 'scheduled') {
             $scheduledDate = Carbon::parse($validated['scheduled_date']);
             $batch->delay($scheduledDate);
@@ -302,12 +305,23 @@ class NewsletterController extends Controller
         // ⚡ PASO 4: Despachar
         $batch->dispatch();
 
-        // ⚡ PASO 5: Guardar batch_id
-        $envio->update(['batch_id' => $batch->id]);
+        // ⚡ PASO 5: Guardar batch_id usando el MODELO (no update)
+        $envio->batch_id = $batch->id;
+        $envio->save();
+
+        // ✅ VERIFICAR que se guardó
+        $envio->refresh();
+        if (empty($envio->batch_id)) {
+            Log::warning('⚠️ batch_id no se guardó correctamente', [
+                'envio_id' => $envio->id,
+                'batch_id' => $batch->id
+            ]);
+        }
 
         Log::info('Newsletter encolado correctamente', [
             'envio_id' => $envio->id,
             'batch_id' => $batch->id,
+            'batch_id_guardado' => $envio->batch_id,
             'total_jobs' => count($jobs),
             'scheduled' => $validated['send_type'] === 'scheduled'
         ]);
