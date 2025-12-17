@@ -209,6 +209,7 @@
 @stop
 
 @section('js')
+    <script src="https://code.jquery.com/jquery-3.7.0.js" crossorigin="anonymous"></script>
     <script>
         const envioId = {{ $envio->id }};
         let updateInterval = null;
