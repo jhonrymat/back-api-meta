@@ -304,9 +304,13 @@ class NewsletterController extends Controller
         // ⚡ PASO 4: DESPACHAR (retorna el batch con ID)
         $batch->dispatch();
 
-        // ⚡ PASO 5: Guardar batch_id INMEDIATAMENTE
-        $envio->batch_id = $batch->id;
-        $envio->save();
+        // ⚡ PASO 5: Guardar batch_id usando DB directo (más confiable)
+        DB::table('email_envios')
+            ->where('id', $envio->id)
+            ->update(['batch_id' => $batch->id]);
+
+        // Refrescar el modelo para reflejar el cambio
+        $envio->refresh();
 
         // ✅ Log de confirmación
         Log::info('Newsletter encolado correctamente', [
