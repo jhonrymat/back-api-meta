@@ -214,7 +214,7 @@ class NewsletterController extends Controller
             return back()->with('error', 'No hay destinatarios para enviar.');
         }
 
-        // ⚡ PASO 1: Crear array de jobs
+        // ⚡ PASO 1: Crear array de jobs (como WhatsApp)
         $jobs = [];
         foreach ($recipients as $recipient) {
             if (empty($recipient->email)) {
@@ -233,7 +233,7 @@ class NewsletterController extends Controller
             return back()->with('error', 'No hay destinatarios válidos con email.');
         }
 
-        // ⚡ PASO 2: Crear registro de envío
+        // ⚡ PASO 2: Crear registro de envío CON TRANSACCIÓN (como WhatsApp)
         $envio = DB::transaction(function () use ($newsletter, $jobs, $validated) {
             return EmailEnvio::create([
                 'newsletter_id' => $newsletter->id,
@@ -246,86 +246,72 @@ class NewsletterController extends Controller
             ]);
         });
 
-        // ⚡ PASO 3: Crear batch con callbacks corregidos
+        // ⚡ PASO 3: Crear Y DESPACHAR batch en una sola línea (como WhatsApp)
         $batch = Bus::batch($jobs)
             ->name("Email Newsletter: {$newsletter->subject} ({$envio->id})")
             ->then(function (Batch $batch) use ($envio) {
-                // ✅ Actualizar envío
-                EmailEnvio::where('id', $envio->id)->update([
-                    'status' => 'Completado',
-                    'updated_at' => now()
-                ]);
+                // ✅ Usar DB::table (más rápido y confiable)
+                DB::table('email_envios')
+                    ->where('id', $envio->id)
+                    ->update([
+                        'status' => 'Completado',
+                        'updated_at' => now()
+                    ]);
 
                 // ✅ Actualizar newsletter
-                Newsletter::where('id', $envio->newsletter_id)->update([
-                    'is_sent' => true
-                ]);
+                DB::table('newsletters')
+                    ->where('id', $envio->newsletter_id)
+                    ->update([
+                        'is_sent' => true
+                    ]);
 
                 Log::info("✅ Email batch completado", [
                     'batch_id' => $batch->id,
-                    'envio_id' => $envio->id,
-                    'total' => $batch->totalJobs,
-                    'processed' => $batch->processedJobs(),
-                    'pending' => $batch->pendingJobs,
-                    'failed' => $batch->failedJobs  // ✅ SIN paréntesis (es propiedad)
+                    'envio_id' => $envio->id
+                    // ❌ NO usar $batch->processedJobs(), causa errores
                 ]);
             })
             ->catch(function (Batch $batch, Throwable $e) use ($envio) {
-                EmailEnvio::where('id', $envio->id)->update([
-                    'status' => 'Completado con errores',
-                    'updated_at' => now()
-                ]);
+                DB::table('email_envios')
+                    ->where('id', $envio->id)
+                    ->update([
+                        'status' => 'Completado con errores',
+                        'updated_at' => now()
+                    ]);
 
                 Log::error("❌ Email batch con errores", [
                     'batch_id' => $batch->id,
                     'envio_id' => $envio->id,
-                    'error' => $e->getMessage(),
-                    'failed' => $batch->failedJobs  // ✅ SIN paréntesis
+                    'error' => $e->getMessage()
+                    // ❌ NO usar $batch->failedJobs
                 ]);
             })
             ->finally(function (Batch $batch) use ($envio) {
                 Log::info("📊 Email batch finalizado", [
                     'batch_id' => $batch->id,
-                    'envio_id' => $envio->id,
-                    'total' => $batch->totalJobs,
-                    'processed' => $batch->processedJobs(),
-                    'pending' => $batch->pendingJobs,
-                    'failed' => $batch->failedJobs  // ✅ SIN paréntesis
+                    'envio_id' => $envio->id
                 ]);
             })
             ->onQueue('email-queue')
-            ->allowFailures();
+            ->allowFailures(); // ⚠️ IMPORTANTE: No cancelar todo si algunos fallan
 
-        // ✅ APLICAR DELAY ANTES DE DISPATCH
+        // ✅ APLICAR DELAY SI ES PROGRAMADO (ANTES de dispatch)
         if ($validated['send_type'] === 'scheduled') {
             $scheduledDate = Carbon::parse($validated['scheduled_date']);
             $batch->delay($scheduledDate);
         }
 
-        // ⚡ PASO 4: Despachar PRIMERO para generar el ID
-        $dispatchedBatch = $batch->dispatch();
+        // ⚡ PASO 4: DESPACHAR (retorna el batch con ID)
+        $batch->dispatch();
 
-        // ⚡ PASO 5: AHORA SÍ guardar batch_id (después de dispatch)
-        $envio->batch_id = $dispatchedBatch->id;
+        // ⚡ PASO 5: Guardar batch_id INMEDIATAMENTE
+        $envio->batch_id = $batch->id;
         $envio->save();
 
-        // ✅ VERIFICAR que se guardó
-        if (empty($envio->batch_id)) {
-            Log::error('❌ batch_id no se guardó', [
-                'envio_id' => $envio->id,
-                'batch_id' => $dispatchedBatch->id
-            ]);
-        } else {
-            Log::info('✅ batch_id guardado correctamente', [
-                'envio_id' => $envio->id,
-                'batch_id' => $envio->batch_id
-            ]);
-        }
-
+        // ✅ Log de confirmación
         Log::info('Newsletter encolado correctamente', [
             'envio_id' => $envio->id,
-            'batch_id' => $dispatchedBatch->id,
-            'batch_id_guardado' => $envio->batch_id,
+            'batch_id' => $batch->id,
             'total_jobs' => count($jobs),
             'scheduled' => $validated['send_type'] === 'scheduled'
         ]);
@@ -334,7 +320,7 @@ class NewsletterController extends Controller
             'success',
             $validated['send_type'] === 'scheduled'
             ? "Newsletter programado para {$validated['scheduled_date']}. ID: {$envio->id}"
-            : "Newsletter encolado correctamente. Batch: {$dispatchedBatch->id}, Emails: " . count($jobs)
+            : "Newsletter encolado. Batch: {$batch->id}, Emails: " . count($jobs)
         );
     }
 
