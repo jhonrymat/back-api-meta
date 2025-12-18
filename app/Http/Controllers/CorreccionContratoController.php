@@ -265,7 +265,7 @@ class CorreccionContratoController extends Controller
         $request->validate([
             'resultado_id' => 'required|integer',
             'campo' => 'required|string',
-            'valor' => 'required'
+            'valor' => 'nullable'
         ]);
 
         // Validar que el campo sea permitido
