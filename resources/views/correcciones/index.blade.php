@@ -509,7 +509,7 @@
             e.preventDefault();
 
             const campo = document.getElementById('edit_contrato_campo').value;
-            const valor = document.getElementById('edit_contrato_valor').value;
+            let valor = document.getElementById('edit_contrato_valor').value;
             const ordenId = document.getElementById('edit_orden_id').value;
 
             if (!campo) {
@@ -598,7 +598,7 @@
             e.preventDefault();
 
             const campo = document.getElementById('edit_necesidad_campo').value;
-            const valor = document.getElementById('edit_necesidad_valor').value;
+            let valor = document.getElementById('edit_necesidad_valor').value;
             const necesidadId = document.getElementById('edit_necesidad_id').value;
 
             if (!campo) {
@@ -744,7 +744,7 @@
             e.preventDefault();
 
             const campo = document.getElementById('edit_resultado_campo').value;
-            const valor = document.getElementById('edit_resultado_valor').value;
+            let valor = document.getElementById('edit_resultado_valor').value;
             const resultadoId = document.getElementById('edit_resultado_id').value;
 
             if (!campo) {
