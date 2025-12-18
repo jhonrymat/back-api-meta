@@ -148,7 +148,7 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label"><strong>Nuevo Valor:</strong></label>
-                                <input type="text" class="form-control" id="edit_contrato_valor" required>
+                                <input type="text" class="form-control" id="edit_contrato_valor">
                                 <small class="text-muted">
                                     Deja vacío o escribe "null" para borrar este campo
                                 </small>
@@ -210,7 +210,7 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label"><strong>Nuevo Valor:</strong></label>
-                                <input type="text" class="form-control" id="edit_necesidad_valor" required>
+                                <input type="text" class="form-control" id="edit_necesidad_valor">
                                 <small class="text-muted">
                                     Deja vacío o escribe "null" para borrar este campo
                                 </small>
@@ -273,7 +273,7 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label"><strong>Nuevo Valor:</strong></label>
-                                <input type="text" class="form-control" id="edit_resultado_valor" required>
+                                <input type="text" class="form-control" id="edit_resultado_valor">
                                 <small class="text-muted">
                                     Deja vacío o escribe "null" para borrar este campo
                                 </small>
