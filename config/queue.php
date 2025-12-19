@@ -80,7 +80,7 @@ return [
             'queue' => env('SQS_QUEUE', 'default'),
             'suffix' => env('SQS_SUFFIX'),
             'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
-            'after_commit' => false,
+            'after_commit' => true,
         ],
 
 
@@ -92,7 +92,7 @@ return [
             'queue' => env('SQS_WHATSAPP_QUEUE', 'whatsapp-queue'),
             'suffix' => env('SQS_SUFFIX'),
             'region' => env('AWS_DEFAULT_REGION', 'us-east-2'),
-            'after_commit' => false,
+            'after_commit' => true,
         ],
         'sqs-email-queue' => [
             'driver' => 'sqs',
@@ -102,7 +102,7 @@ return [
             'queue' => env('SQS_EMAIL_QUEUE', 'email-queue'),
             'suffix' => env('SQS_SUFFIX'),
             'region' => env('AWS_DEFAULT_REGION', 'us-east-2'),
-            'after_commit' => false,
+            'after_commit' => true,
         ],
 
         'redis' => [

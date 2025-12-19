@@ -32,6 +32,30 @@ Route::post('/store-data', [ClocalController::class, 'storeData']);
 
 
 Route::get('/permitir-imagenes/{botId}', [BotController::class, 'permitirImagenes']);
+
+Route::get('/health/batches', function () {
+    $anomalousBatches = DB::table('job_batches')
+        ->where(function ($q) {
+            $q->where('total_jobs', '=', 0)
+                ->orWhere('pending_jobs', '<', 0);
+        })
+        ->where('created_at', '>', now()->subHours(24))
+        ->count();
+
+    $recentBatches = DB::table('job_batches')
+        ->where('created_at', '>', now()->subHours(24))
+        ->count();
+
+    return response()->json([
+        'status' => $anomalousBatches === 0 ? 'healthy' : 'warning',
+        'recent_batches' => $recentBatches,
+        'anomalous_batches' => $anomalousBatches,
+        'anomaly_rate' => $recentBatches > 0
+            ? round(($anomalousBatches / $recentBatches) * 100, 2) . '%'
+            : '0%'
+    ]);
+});
+
 // Route::get('/whatsapp-webhook', [MessageController::class, 'verifyWebhook']);
 // Route::post('/whatsapp-webhook', [MessageController::class, 'processWebhook']);
 // Route::apiResources([
