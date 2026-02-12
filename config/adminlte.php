@@ -515,6 +515,18 @@ return [
             ],
         ],
         [
+            'text' => 'Medios',
+            'icon' => 'fas fa-fw fa-photo-video',
+            'submenu' => [
+                [
+                    'text' => 'Subir archivos',
+                    'route' => 'media.index',
+                    'can' => 'contactos.index',
+                    'icon' => 'fas fa-fw fa-upload',
+                ],
+            ],
+        ],
+        [
             'text' => 'Administración',
             'icon' => 'fas fa-fw fa-cogs',
             'submenu' => [

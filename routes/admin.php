@@ -1,39 +1,40 @@
 <?php
 
-use App\Models\User;
-use App\Models\Reporte;
-use App\Http\Controllers\BotIA;
-use App\Jobs\SendNotificationJob;
-use Illuminate\Support\Facades\DB;
-// use Illuminate\Support\Facades\Redis;
-use OpenAI\Laravel\Facades\OpenAI;
-use App\Livewire\ContactoComponent;
-use Illuminate\Support\Facades\Bus;
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AplicacionesController;
 use App\Http\Controllers\BotController;
-use App\Http\Controllers\TagController;
-use App\Http\Controllers\UserController;
+use App\Http\Controllers\BotIA;
+use App\Http\Controllers\ChatBotController;
+use App\Http\Controllers\ClocalController;
+// use Illuminate\Support\Facades\Redis;
+use App\Http\Controllers\ContactoController;
+use App\Http\Controllers\ConteoController;
+use App\Http\Controllers\CorreccionContratoController;
+use App\Http\Controllers\CustomFieldController;
 use App\Http\Controllers\EmailController;
+use App\Http\Controllers\EmailTemplateController;
 use App\Http\Controllers\EnvioController;
+use App\Http\Controllers\ErrorLogController;
+use App\Http\Controllers\EstadisticasController;
 
 use App\Http\Controllers\GroupController;
 use App\Http\Controllers\LeadsController;
-use App\Http\Controllers\RolesController;
-use App\Http\Controllers\ClocalController;
-use App\Http\Controllers\ConteoController;
-use App\Http\Controllers\ChatBotController;
+use App\Http\Controllers\MediaController;
 use App\Http\Controllers\MessageController;
+use App\Http\Controllers\NewsletterController;
 use App\Http\Controllers\NumerosController;
 use App\Http\Controllers\PermisoController;
-use App\Http\Controllers\ContactoController;
-use App\Http\Controllers\ErrorLogController;
-use App\Http\Controllers\NewsletterController;
-use App\Http\Controllers\CustomFieldController;
-use App\Http\Controllers\AplicacionesController;
-use App\Http\Controllers\EstadisticasController;
 use App\Http\Controllers\ProgramadosControllers;
-use App\Http\Controllers\EmailTemplateController;
-use App\Http\Controllers\CorreccionContratoController;
+use App\Http\Controllers\RolesController;
+use App\Http\Controllers\TagController;
+use App\Http\Controllers\UserController;
+use App\Jobs\SendNotificationJob;
+use App\Livewire\ContactoComponent;
+use App\Models\Reporte;
+use App\Models\User;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
+use OpenAI\Laravel\Facades\OpenAI;
 
 Route::resource(
     'aplicaciones',
@@ -353,4 +354,14 @@ Route::middleware(['auth'])->prefix('correcciones')->group(function () {
     Route::post('/actualizar-necesidad', [CorreccionContratoController::class, 'actualizarNecesidad'])->name('correcciones.actualizar-necesidad');
     Route::post('/obtener-resultados', [CorreccionContratoController::class, 'obtenerResultados'])->name('correcciones.resultados');
     Route::post('/actualizar-resultado', [CorreccionContratoController::class, 'actualizarResultado'])->name('correcciones.actualizar-resultado');
+});
+
+Route::middleware(['auth'])->prefix('media')->name('media.')->group(function () {
+    Route::get('/', [MediaController::class, 'index'])->name('index');
+    Route::post('/upload', [MediaController::class, 'upload'])->name('upload');
+    Route::get('/{media}', [MediaController::class, 'show'])->name('show');
+    Route::put('/{media}', [MediaController::class, 'update'])->name('update');
+    Route::delete('/{media}', [MediaController::class, 'destroy'])->name('destroy');
+    Route::get('/{media}/download', [MediaController::class, 'download'])->name('download');
+    Route::post('/bulk-delete', [MediaController::class, 'bulkDelete'])->name('bulk-delete');
 });
