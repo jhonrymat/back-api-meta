@@ -54,7 +54,7 @@ class MediaController extends Controller
     public function upload(Request $request)
     {
         $request->validate([
-            'files.*' => 'required|file|max:51200', // 50MB max
+            'files.*' => 'required|file|max:204800', // 50MB max
         ]);
 
         $uploaded = [];
