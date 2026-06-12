@@ -2,18 +2,17 @@
 
 namespace App\Jobs;
 
-use App\Models\Message;
+use App\Models\Numeros;
 use App\Models\Reporte;
+use Exception;
 use Illuminate\Bus\Queueable;
-use App\Exports\MessagesExport;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Maatwebsite\Excel\Facades\Excel;
-use Illuminate\Queue\SerializesModels;
-use Illuminate\Queue\InteractsWithQueue;
-use App\Http\Controllers\MessageController;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class ExportMessages implements ShouldQueue
 {
@@ -24,7 +23,9 @@ class ExportMessages implements ShouldQueue
     protected $reportId;
     protected $id_telefono;
 
-    public $timeout = 120000;
+    public $tries = 3;
+    public $timeout = 300;
+    public $backoff = 30;
 
     public function __construct($startDate, $endDate, $reportId, $id_telefono)
     {
@@ -37,42 +38,90 @@ class ExportMessages implements ShouldQueue
     public function handle()
     {
         try {
-            $results = DB::select('CALL GetMessagesReport(?, ?, ?)', [$this->startDate, $this->endDate, $this->id_telefono]);
-            if (!empty($results)) {
+            $results = DB::select('CALL GetMessagesReport(?, ?, ?)', [
+                $this->startDate,
+                $this->endDate,
+                $this->id_telefono
+            ]);
 
-                $fileName = 'messages_export_' . now()->format('Y-m-d_His') . '.csv';  // Cambio de extensión a CSV
+            if (!empty($results)) {
+                $fileName = 'messages_export_' . now()->format('Y-m-d_His') . '.csv';
                 $filePath = storage_path('app/' . $fileName);
 
-                // Crear archivo CSV
                 $handle = fopen($filePath, 'w');
-
-                $headers = ['ID', 'Nombre', 'Numero', 'Estado', 'Distintivo', 'vacio', 'Fecha'];
-                fputcsv($handle, $headers);
+                fputcsv($handle, ['ID', 'Nombre', 'Numero', 'Estado', 'Distintivo', 'vacio', 'Fecha']);
 
                 foreach ($results as $row) {
                     fputcsv($handle, (array) $row);
                 }
                 fclose($handle);
 
-                // Actualizar el registro del reporte con la ruta del archivo
                 $report = Reporte::find($this->reportId);
                 if ($report) {
                     $report->archivo = $fileName;
                     $report->save();
                 }
             } else {
-                Log::error("No se encontraron resultados.");
+                Log::error("No se encontraron resultados para el reporte {$this->reportId}");
             }
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("Error al exportar mensajes: {$e->getMessage()}", ['exception' => $e]);
-            throw $e; // Lanzar la excepción para que el trabajo en cola se reintentara
+            throw $e;
         }
 
-        // Opcional: aquí podrías despachar otro job para enviar notificaciones de que el archivo está listo, etc.
-        $controller = new MessageController();
-        $controller->sendReport($this->reportId);
+        // Notificar al usuario que el reporte está listo
+        try {
+            $reporte = Reporte::findOrFail($this->reportId);
+            $numero = Numeros::where('id_telefono', $reporte->id_telefono)
+                ->with('users')
+                ->firstOrFail();
 
+            $user = $numero->users()->first();
 
+            if (!$user) {
+                Log::warning("No se encontró usuario para el reporte {$this->reportId}");
+                return;
+            }
+
+            $payload = [
+                'messaging_product' => 'whatsapp',
+                'to' => $user->phone,
+                'type' => 'template',
+                'template' => [
+                    'name' => 'reporte_mensual',
+                    'language' => ['code' => 'es'],
+                    'components' => [
+                        [
+                            'type' => 'header',
+                            'parameters' => [
+                                ['type' => 'text', 'text' => $user->name]
+                            ]
+                        ],
+                        [
+                            'type' => 'button',
+                            'index' => '0',
+                            'sub_type' => 'url',
+                            'parameters' => [
+                                ['type' => 'text', 'text' => (string) $this->reportId]
+                            ]
+                        ],
+                    ]
+                ]
+            ];
+
+            Http::withToken(env('WHATSAPP_API_TOKEN'))
+                ->post(
+                    'https://graph.facebook.com/v22.0/' . env('WHATSAPP_API_PHONE_ID') . '/messages',
+                    $payload
+                )
+                ->throw()
+                ->json();
+
+            Log::info('Notificación de reporte enviada', ['reporte_id' => $this->reportId]);
+
+        } catch (Exception $e) {
+            Log::error('Error al enviar notificación de reporte: ' . $e->getMessage());
+        }
     }
 }

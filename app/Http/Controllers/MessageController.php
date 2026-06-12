@@ -322,8 +322,8 @@ class MessageController extends Controller
                 $user = Auth::user();
                 // Acceder a la información del usuario
 
-                $token = 'EAAVGPBd0gvkBO7kWVSz5E8tTEZBcwC86fkK3JwsUeYCxZA04aHWaOyvkpmQu94lZC6BViNmZAZA9jHilijZA1nFXdDqrlXGItIUFikMY4JM0tNJlzBGAOkOXZA1lgH4ZAd7y37WSqYXLggZAYu4x5nzZCtsi2amDY3ZBnIngGXVAwaZCTp0UOsvyIWE35hTYE10wcFZBH8nXA2E6p4M2GkRWD';
-                $phoneId = '131481643386780';
+                $token = env('WHATSAPP_API_TOKEN');
+                $phoneId = env('WHATSAPPI_API_PHONE_ID');
                 $version = 'v22.0';
                 $payload = [
                     'messaging_product' => 'whatsapp',
@@ -738,22 +738,20 @@ class MessageController extends Controller
                     'parameters' => $bodyParams,
                 ];
 
-                $tarea = new TareaProgramada();
-                $tarea->token_app = $tokenApp;
-                $tarea->phone_id = $phone_id;
-                $tarea->numeros = $rutaArchivo;
-                $tarea->payload = json_encode($payload);
-                $tarea->body = $personalizedBody; // Guardar el cuerpo de la plantilla sin modificar
-                $tarea->messageData = json_encode($messageData);
-                $tarea->status = 'pendiente';
-                $tarea->fecha_programada = $fechaFormateada;
-                $tarea->tag = $tags;
-                $tarea->distintivo = $distintivo;
-                $tarea->save();
+                $tarea = TareaProgramada::create([
+                    'token_app'       => $tokenApp,
+                    'phone_id'        => $phone_id,
+                    'numeros'         => $rutaArchivo,
+                    'payload'         => json_encode($payload),
+                    'body'            => $personalizedBody,
+                    'messageData'     => json_encode($messageData),
+                    'status'          => 'pendiente',
+                    'fecha_programada'=> $fechaFormateada,
+                    'tag'             => $tags,
+                    'distintivo'      => $distintivo,
+                ]);
 
                 $user->tareasProgramadas()->attach($tarea->id);
-
-                Artisan::call('send:task', ['--scheduled' => true]);
 
                 return response()->json([
                     'success' => true,

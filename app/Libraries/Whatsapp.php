@@ -16,9 +16,9 @@ class Whatsapp
 
     public function __construct()
     {
-        $this->accessToken = 'EAAVGPBd0gvkBO7kWVSz5E8tTEZBcwC86fkK3JwsUeYCxZA04aHWaOyvkpmQu94lZC6BViNmZAZA9jHilijZA1nFXdDqrlXGItIUFikMY4JM0tNJlzBGAOkOXZA1lgH4ZAd7y37WSqYXLggZAYu4x5nzZCtsi2amDY3ZBnIngGXVAwaZCTp0UOsvyIWE35hTYE10wcFZBH8nXA2E6p4M2GkRWD';
-        $this->phoneId = '131481643386780';
-        $this->wabaId = '143864792140466';
+        $this->accessToken = env('WHATSAPP_API_TOKEN');
+        $this->phoneId = env('WHATSAPPI_API_PHONE_ID');
+        $this->wabaId = env('WHATSAPP_BUSINESS_ID');
     }
 
     public function sendText($to, $text, $phone_id, $tokenApp)

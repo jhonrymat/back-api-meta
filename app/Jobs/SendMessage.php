@@ -63,12 +63,11 @@ class SendMessage implements ShouldQueue
 
         } catch (Exception $e) {
             Log::error('Error en SendMessage Job: ' . $e->getMessage(), [
-                'payload_to' => $this->payload['to'] ?? 'unknown',
-                'trace' => $e->getTraceAsString()
+                'payload' => $this->payload,
+                'phone_id' => $this->phone_id,
             ]);
 
-            // 🔄 Lanzar excepción para que Laravel reintente el job
-            throw $e;
+            $this->fail($e);
         }
     }
 

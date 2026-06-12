@@ -13,7 +13,7 @@ class TareaProgramada extends Model
         'token_app',
         'phone_id',
         'numeros',
-        '$payload',
+        'payload',
         'body',
         'messageData',
         'status',

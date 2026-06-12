@@ -44,6 +44,8 @@ class Kernel extends ConsoleKernel
 
         $schedule->command('batches:monitor')->hourly();
 
+        $schedule->command('horizon:snapshot')->everyFiveMinutes();
+
     }
 
     /**
