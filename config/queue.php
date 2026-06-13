@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'default' => env('QUEUE_CONNECTION', 'sync'),
+    'default' => env('QUEUE_CONNECTION', 'redis'),
 
     // ⚡ AGREGAR ESTO
     'batch' => [
@@ -48,62 +48,6 @@ return [
             'after_commit' => false,
         ],
 
-        'database-whatsapp-queue' => [
-            'driver' => 'database',
-            'table' => 'jobs',
-            'queue' => env('DATABASE_WHATSAPP_QUEUE', 'database-whatsapp-queue'),
-            'retry_after' => 900,
-            'after_commit' => false,
-        ],
-        'database-email-queue' => [
-            'driver' => 'database',
-            'table' => 'jobs',
-            'queue' => env('DATABASE_EMAIL_QUEUE', 'database-email-queue'),
-            'retry_after' => 900,
-            'after_commit' => false,
-        ],
-
-        'beanstalkd' => [
-            'driver' => 'beanstalkd',
-            'host' => 'localhost',
-            'queue' => 'default',
-            'retry_after' => 900,
-            'block_for' => 0,
-            'after_commit' => false,
-        ],
-
-        'sqs' => [
-            'driver' => 'sqs',
-            'key' => env('AWS_ACCESS_KEY_ID'),
-            'secret' => env('AWS_SECRET_ACCESS_KEY'),
-            'prefix' => env('SQS_PREFIX', 'https://sqs.us-east-1.amazonaws.com/your-account-id'),
-            'queue' => env('SQS_QUEUE', 'default'),
-            'suffix' => env('SQS_SUFFIX'),
-            'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
-            'after_commit' => true,
-        ],
-
-
-        'sqs-whatsapp-queue' => [
-            'driver' => 'sqs',
-            'key' => env('AWS_ACCESS_KEY_ID'),
-            'secret' => env('AWS_SECRET_ACCESS_KEY'),
-            'prefix' => env('SQS_PREFIX', 'https://sqs.us-east-2.amazonaws.com/202746746316'),
-            'queue' => env('SQS_WHATSAPP_QUEUE', 'whatsapp-queue'),
-            'suffix' => env('SQS_SUFFIX'),
-            'region' => env('AWS_DEFAULT_REGION', 'us-east-2'),
-            'after_commit' => true,
-        ],
-        'sqs-email-queue' => [
-            'driver' => 'sqs',
-            'key' => env('AWS_ACCESS_KEY_ID'),
-            'secret' => env('AWS_SECRET_ACCESS_KEY'),
-            'prefix' => env('SQS_PREFIX', 'https://sqs.us-east-2.amazonaws.com/202746746316'),
-            'queue' => env('SQS_EMAIL_QUEUE', 'email-queue'),
-            'suffix' => env('SQS_SUFFIX'),
-            'region' => env('AWS_DEFAULT_REGION', 'us-east-2'),
-            'after_commit' => true,
-        ],
 
         'redis' => [
             'driver' => 'redis',

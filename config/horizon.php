@@ -197,33 +197,59 @@ return [
     */
 
     'defaults' => [
-        'supervisor-1' => [
+        'supervisor-whatsapp' => [
             'connection' => 'redis',
-            'queue' => ['default', 'whatsapp-queue', 'email-queue'],
-            'balance' => 'auto',
-            'autoScalingStrategy' => 'time',
-            'maxProcesses' => 1,
-            'maxTime' => 0,
-            'maxJobs' => 0,
-            'memory' => 128,
-            'tries' => 1,
-            'timeout' => 60,
+            'queue' => ['whatsapp-queue'],
+            'balance' => 'simple',
+            'maxProcesses' => 5,
+            'tries' => 3,
+            'timeout' => 90,
+            'backoff' => 10,
             'nice' => 0,
+        ],
+        'supervisor-email' => [
+            'connection' => 'redis',
+            'queue' => ['email-queue'],
+            'balance' => 'simple',
+            'maxProcesses' => 2,
+            'tries' => 3,
+            'timeout' => 60,
+            'nice' => 1,
+        ],
+        'supervisor-default' => [
+            'connection' => 'redis',
+            'queue' => ['default'],
+            'balance' => 'simple',
+            'maxProcesses' => 2,
+            'tries' => 3,
+            'timeout' => 60,
+            'nice' => 2,
         ],
     ],
 
     'environments' => [
         'production' => [
-            'supervisor-1' => [
+            'supervisor-whatsapp' => [
                 'maxProcesses' => 10,
-                'balanceMaxShift' => 1,
+                'balanceMaxShift' => 2,
                 'balanceCooldown' => 3,
             ],
-        ],
-
-        'local' => [
-            'supervisor-1' => [
+            'supervisor-email' => [
+                'maxProcesses' => 5,
+            ],
+            'supervisor-default' => [
                 'maxProcesses' => 3,
+            ],
+        ],
+        'local' => [
+            'supervisor-whatsapp' => [
+                'maxProcesses' => 2,
+            ],
+            'supervisor-email' => [
+                'maxProcesses' => 1,
+            ],
+            'supervisor-default' => [
+                'maxProcesses' => 1,    
             ],
         ],
     ],
