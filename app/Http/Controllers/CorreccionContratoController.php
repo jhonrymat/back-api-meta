@@ -13,21 +13,52 @@ class CorreccionContratoController extends Controller
 
     // Campos permitidos para editar (sin relaciones)
     protected $camposPermitidosContrato = [
-        'orden_servicio', 'objeto', 'desc_general_act', 'tiempo_ejecucion',
-        'fecha_inicio', 'canales', 'interventor', 'administrador', 'dotacion',
-        'alimentacion', 'transporte', 'horario', 'requisitos', 'forma_fecha',
-        'observaciones', 'obs_proceso', 'status', 'moderation_status'
+        'orden_servicio',
+        'objeto',
+        'desc_general_act',
+        'tiempo_ejecucion',
+        'fecha_inicio',
+        'canales',
+        'interventor',
+        'administrador',
+        'dotacion',
+        'alimentacion',
+        'transporte',
+        'horario',
+        'requisitos',
+        'forma_fecha',
+        'observaciones',
+        'obs_proceso',
+        'status',
+        'moderation_status'
     ];
 
     protected $camposPermitidosNecesidad = [
-        'nombre', 'tipo_unidad', 'total', 'empresa', 'local', 'descripcion',
-        'vacante', 'tipo_requerimiento', 'tipo_salario', 'tipo_contrato',
-        'pruebas', 'examenes', 'status', 'moderation_status'
+        'nombre',
+        'tipo_unidad',
+        'total',
+        'empresa',
+        'local',
+        'descripcion',
+        'vacante',
+        'tipo_requerimiento',
+        'tipo_salario',
+        'tipo_contrato',
+        'pruebas',
+        'examenes',
+        'status',
+        'moderation_status'
     ];
 
     protected $camposPermitidosResultado = [
-        'r_empresa', 'r_nit', 'r_municipio', 'r_observaciones',
-        'r_codigo_vacante', 'r_codigo_certi_resi', 'r_prestador_spe', 'r_postulados'
+        'r_empresa',
+        'r_nit',
+        'r_municipio',
+        'r_observaciones',
+        'r_codigo_vacante',
+        'r_codigo_certi_resi',
+        'r_prestador_spe',
+        'r_postulados'
     ];
 
     /**
@@ -47,31 +78,43 @@ class CorreccionContratoController extends Controller
             'contrato_id' => 'required|integer'
         ]);
 
-        $contrato = DB::connection($this->conexionExterna)
-            ->table('ordenes')
-            ->where('id', $request->contrato_id)
-            ->first();
+        try {
+            $contrato = DB::connection($this->conexionExterna)
+                ->table('ordenes')
+                ->where('id', $request->contrato_id)
+                ->first();
 
-        if (!$contrato) {
+            if (!$contrato) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Contrato no encontrado'
+                ], 404);
+            }
+
+            $necesidades = DB::connection($this->conexionExterna)
+                ->table('necesidades')
+                ->where('contrato_id', $contrato->contrato_id)
+                ->orderBy('id', 'DESC')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'contrato' => $contrato,
+                'necesidades' => $necesidades
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al buscar contrato', [
+                'error' => $e->getMessage(),
+                'conexion' => $this->conexionExterna
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Contrato no encontrado'
-            ], 404);
+                'message' => 'Error de conexión: ' . $e->getMessage()
+            ], 500);
         }
-
-        // Obtener necesidades relacionadas
-        $necesidades = DB::connection($this->conexionExterna)
-            ->table('necesidades')
-            ->where('contrato_id', $contrato->contrato_id)
-            ->orderBy('id', 'DESC')
-            ->get();
-
-        return response()->json([
-            'success' => true,
-            'contrato' => $contrato,
-            'necesidades' => $necesidades
-        ]);
-    }
+    }   
 
     /**
      * Actualizar información del contrato (sin relaciones)
@@ -84,7 +127,7 @@ class CorreccionContratoController extends Controller
             'valor' => 'nullable'
         ]);
 
-         if ($request->campo === 'status') {
+        if ($request->campo === 'status') {
             if ($request->valor !== 'publicado' && $request->valor !== 'cerrado') {
                 return response()->json([
                     'success' => false,
