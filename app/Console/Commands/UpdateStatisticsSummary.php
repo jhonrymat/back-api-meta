@@ -25,32 +25,31 @@ class UpdateStatisticsSummary extends Command
 
             // Obtener estadísticas resumidas desde `newsletter_statistics`
             $summaries = DB::table('newsletter_statistics')
-                ->selectRaw('
+                ->selectRaw("
                     newsletter_id,
                     DATE(created_at) as date,
                     COUNT(*) as sent_count,
-                    SUM(status = "Open") as open_count,
-                    SUM(status = "Bounce") as error_count,
-                    SUM(status = "Complaint") as unsubscribe_count,
-                    SUM(status = "Click") as click_count,
-                    SUM(status = "Delivery") as delivery_count,
-                    SUM(NOT status IN ("Open", "Bounce", "Complaint", "Click", "Delivery")) as unknown_count,
-                    SUM(browser = "Firefox") as firefox_count,
-                    SUM(browser = "Chrome") as chrome_count,
-                    SUM(browser = "Safari") as safari_count,
-                    SUM(browser = "Edge") as edge_count,
-                    SUM(browser = "Opera") as opera_count,
-                    SUM(browser = "Desconocido") as unknown_browser_count,
-                    SUM(operating_system = "Windows") as windows_count,
-                    SUM(operating_system = "MacOS") as macos_count,
-                    SUM(operating_system = "Linux") as linux_count,
-                    SUM(operating_system = "Android") as android_count,
-                    SUM(operating_system = "iOS") as ios_count,
-                    SUM(operating_system = "Desconocido") as unknown_os_count
-                ')
+                    SUM(status = 'Open') as open_count,
+                    SUM(status = 'Bounce') as error_count,
+                    SUM(status = 'Complaint') as unsubscribe_count,
+                    SUM(status = 'Click') as click_count,
+                    SUM(status = 'Delivery') as delivery_count,
+                    SUM(NOT status IN ('Open', 'Bounce', 'Complaint', 'Click', 'Delivery')) as unknown_count,
+                    SUM(browser = 'Firefox') as firefox_count,
+                    SUM(browser = 'Chrome') as chrome_count,
+                    SUM(browser = 'Safari') as safari_count,
+                    SUM(browser = 'Edge') as edge_count,
+                    SUM(browser = 'Opera') as opera_count,
+                    SUM(browser = 'Desconocido') as unknown_browser_count,
+                    SUM(operating_system = 'Windows') as windows_count,
+                    SUM(operating_system = 'MacOS') as macos_count,
+                    SUM(operating_system = 'Linux') as linux_count,
+                    SUM(operating_system = 'Android') as android_count,
+                    SUM(operating_system = 'iOS') as ios_count,
+                    SUM(operating_system = 'Desconocido') as unknown_os_count
+                ")
                 ->groupBy('newsletter_id', 'date')
                 ->get();
-
             // Insertar los datos resumidos en la tabla `statistics_summary`
             $insertData = $summaries->map(function ($summary) {
                 return [
