@@ -20,37 +20,36 @@ class UpdateStatisticsSummary extends Command
         $this->info("Iniciando la actualización de estadísticas...");
 
         try {
-            // Limpiar la tabla `statistics_summary` antes de regenerar datos
             DB::table('statistics_summary')->truncate();
 
-            // Obtener estadísticas resumidas desde `newsletter_statistics`
-            $summaries = DB::table('newsletter_statistics')
+            $summaries = DB::table('newsletter_statistics as ns')
+                ->join('newsletters as n', 'ns.newsletter_id', '=', 'n.id')
                 ->selectRaw("
-                    newsletter_id,
-                    DATE(created_at) as date,
+                    ns.newsletter_id,
+                    DATE(ns.created_at) as date,
                     COUNT(*) as sent_count,
-                    SUM(status = 'Open') as open_count,
-                    SUM(status = 'Bounce') as error_count,
-                    SUM(status = 'Complaint') as unsubscribe_count,
-                    SUM(status = 'Click') as click_count,
-                    SUM(status = 'Delivery') as delivery_count,
-                    SUM(NOT status IN ('Open', 'Bounce', 'Complaint', 'Click', 'Delivery')) as unknown_count,
-                    SUM(browser = 'Firefox') as firefox_count,
-                    SUM(browser = 'Chrome') as chrome_count,
-                    SUM(browser = 'Safari') as safari_count,
-                    SUM(browser = 'Edge') as edge_count,
-                    SUM(browser = 'Opera') as opera_count,
-                    SUM(browser = 'Desconocido') as unknown_browser_count,
-                    SUM(operating_system = 'Windows') as windows_count,
-                    SUM(operating_system = 'MacOS') as macos_count,
-                    SUM(operating_system = 'Linux') as linux_count,
-                    SUM(operating_system = 'Android') as android_count,
-                    SUM(operating_system = 'iOS') as ios_count,
-                    SUM(operating_system = 'Desconocido') as unknown_os_count
+                    COALESCE(SUM(ns.status = 'Open'), 0) as open_count,
+                    COALESCE(SUM(ns.status = 'Bounce'), 0) as error_count,
+                    COALESCE(SUM(ns.status = 'Complaint'), 0) as unsubscribe_count,
+                    COALESCE(SUM(ns.status = 'Click'), 0) as click_count,
+                    COALESCE(SUM(ns.status = 'Delivery'), 0) as delivery_count,
+                    COALESCE(SUM(NOT ns.status IN ('Open', 'Bounce', 'Complaint', 'Click', 'Delivery')), 0) as unknown_count,
+                    COALESCE(SUM(ns.browser = 'Firefox'), 0) as firefox_count,
+                    COALESCE(SUM(ns.browser = 'Chrome'), 0) as chrome_count,
+                    COALESCE(SUM(ns.browser = 'Safari'), 0) as safari_count,
+                    COALESCE(SUM(ns.browser = 'Edge'), 0) as edge_count,
+                    COALESCE(SUM(ns.browser = 'Opera'), 0) as opera_count,
+                    COALESCE(SUM(ns.browser = 'Desconocido'), 0) as unknown_browser_count,
+                    COALESCE(SUM(ns.operating_system = 'Windows'), 0) as windows_count,
+                    COALESCE(SUM(ns.operating_system = 'MacOS'), 0) as macos_count,
+                    COALESCE(SUM(ns.operating_system = 'Linux'), 0) as linux_count,
+                    COALESCE(SUM(ns.operating_system = 'Android'), 0) as android_count,
+                    COALESCE(SUM(ns.operating_system = 'iOS'), 0) as ios_count,
+                    COALESCE(SUM(ns.operating_system = 'Desconocido'), 0) as unknown_os_count
                 ")
-                ->groupBy('newsletter_id', 'date')
+                ->groupBy('ns.newsletter_id', 'date')
                 ->get();
-            // Insertar los datos resumidos en la tabla `statistics_summary`
+
             $insertData = $summaries->map(function ($summary) {
                 return [
                     'newsletter_id' => $summary->newsletter_id,
