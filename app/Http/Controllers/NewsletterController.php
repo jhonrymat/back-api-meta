@@ -207,10 +207,27 @@ class NewsletterController extends Controller
         ]);
 
         $emailTemplate = EmailTemplate::find($validated['email_template_id']);
-        $recipients = $newsletter->getRecipients();
+        $recipientsData = $newsletter->getRecipients();
+        $recipients = $recipientsData['unicos'];
+        $origenes = $recipientsData['origenes'];
 
         if ($recipients->isEmpty()) {
             return back()->with('error', 'No hay destinatarios para enviar.');
+        }
+
+        // Guardar los orígenes ANTES de encolar (para trazabilidad)
+        $origenesInsert = $origenes->map(function ($item) use ($newsletter) {
+            return [
+                'newsletter_id' => $newsletter->id,
+                'email' => strtolower($item->email),
+                'origen_tipo' => $item->origen_tipo ?? 'desconocido',
+                'origen_id' => $item->origen_id ?? 0,
+                'created_at' => now(),
+            ];
+        })->toArray();
+
+        foreach (array_chunk($origenesInsert, 500) as $chunk) {
+            DB::table('newsletter_envio_origen')->insert($chunk);
         }
 
         // ⚡ SOLUCIÓN: Preparar jobs primero

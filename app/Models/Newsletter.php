@@ -43,23 +43,37 @@ class Newsletter extends Model
     public function getRecipients()
     {
         $groupRecipients = $this->groups->flatMap(function ($group) {
-            return $group->userEmails;
+            return $group->userEmails->map(function ($userEmail) use ($group) {
+                $userEmail->origen_tipo = 'group';
+                $userEmail->origen_id = $group->id;
+                return $userEmail;
+            });
         });
 
-        $tagRecipients = $this->tags->flatMap(fn ($tag) => $tag->contactos->map(function ($contacto) {
-            return (object) [
-                'name' => $contacto->nombre,
-                'email' => $contacto->correo,
-            ];
-        }));
+        $tagRecipients = $this->tags->flatMap(function ($tag) {
+            return $tag->contactos->map(function ($contacto) use ($tag) {
+                return (object) [
+                    'name' => $contacto->nombre,
+                    'email' => $contacto->correo,
+                    'origen_tipo' => 'tag',
+                    'origen_id' => $tag->id,
+                ];
+            });
+        });
 
-        return $groupRecipients
-            ->merge($tagRecipients)
-            ->filter(fn($recipient) => !empty($recipient->email))
-            ->unique('email');
+        // Combinamos TODO (sin deduplicar aún) para guardar el origen completo
+        $todosConOrigen = $groupRecipients->merge($tagRecipients)
+            ->filter(fn($recipient) => !empty($recipient->email));
+
+        // Deduplicado para el envío real (1 correo por persona)
+        $recipientsUnicos = $todosConOrigen->unique('email');
+
+        // Guardamos la relación completa para trazabilidad (no deduplicada)
+        return [
+            'unicos' => $recipientsUnicos,
+            'origenes' => $todosConOrigen,
+        ];
     }
-
-
 
 
 }
